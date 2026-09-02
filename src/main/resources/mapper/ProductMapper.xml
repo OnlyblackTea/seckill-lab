@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.devteam.seckill.mapper.ProductMapper">
+
+    <resultMap id="productMap" type="com.devteam.seckill.domain.Product">
+        <id     property="id"         column="id"/>
+        <result property="name"       column="name"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="status"     column="status"/>
+        <result property="price"      column="price"/>
+        <result property="stock"      column="stock"/>
+        <result property="version"    column="version"/>
+        <result property="createdAt"  column="created_at"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, name, category_id, status, price, stock, version, created_at
+    </sql>
+
+    <!-- Stage 0：主键查询（已实现） -->
+    <select id="selectById" resultMap="productMap">
+        SELECT <include refid="baseColumns"/>
+        FROM product
+        WHERE id = #{id}
+    </select>
+
+    <!-- Stage 0：全表查询（已实现）。大表下这是全表扫描，Stage 1 用它对比优化前后。 -->
+    <select id="selectAll" resultMap="productMap">
+        SELECT <include refid="baseColumns"/>
+        FROM product
+    </select>
+
+    <!-- ============================================================
+         Stage 1（你来实现）：searchProducts
+         ------------------------------------------------------------
+         需求：WHERE category_id = #{categoryId}
+                 AND status      = #{status}
+                 AND price BETWEEN #{minPrice} AND #{maxPrice}
+               ORDER BY price ASC
+               LIMIT #{limit}
+         返回列：至少包含 id,name,category_id,status,price,stock（resultMap=productMap）
+
+         现在这里是【注释掉的占位】，所以接口方法未绑定，调用会抛 BindingException，
+         Stage 1 验收测试因此"初始红"。请把下面的注释去掉并补全 SQL：
+
+         <select id="searchProducts" resultMap="productMap">
+             SELECT <include refid="baseColumns"/>
+             FROM product
+             WHERE ...
+             ORDER BY ...
+             LIMIT #{limit}
+         </select>
+
+         提示：写完 SQL 只是第一步，还要在
+         src/main/resources/db/migration/V1__stage01_product_search_index.sql
+         里加合适的索引，并用 EXPLAIN 证明命中（type=ref/range，而非 ALL）。
+         ============================================================ -->
+
+</mapper>

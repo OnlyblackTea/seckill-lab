@@ -1,0 +1,50 @@
+# seckill-lab 基础设施：MySQL 8 + Redis 7
+# 端口刻意避开宿主机已占用端口（例如另一项目的 PostgreSQL 5432）。
+#   MySQL: 宿主 13306 -> 容器 3306
+#   Redis: 宿主 16379 -> 容器 6379
+# 启动： docker compose up -d
+# 重置： docker compose down -v   （-v 删除数据卷，init 脚本会在下次 up 时重跑）
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: seckill_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: bagu1234
+      MYSQL_DATABASE: seckill_lab
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "13306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pbagu1234"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7
+    container_name: seckill_redis
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql_data:
+  redis_data:

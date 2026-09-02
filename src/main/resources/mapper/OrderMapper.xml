@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.devteam.seckill.mapper.OrderMapper">
+
+    <!-- ============================================================
+         Stage 2/3（你来实现）：
+           * insertOrder   —— 插入订单（配合 @Transactional 与扣库存原子提交）
+           * countByProduct—— 统计某商品已创建订单数（Stage 3 校验是否超卖）
+         目前留空（未绑定），下单相关工单解锁后再补。
+         ============================================================ -->
+
+</mapper>

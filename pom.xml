@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.devteam</groupId>
+    <artifactId>seckill-lab</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>seckill-lab</name>
+    <description>交互式后端数据库八股学习项目（秒杀/电商下单）</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <mybatis.starter.version>3.0.3</mybatis.starter.version>
+        <!-- 默认排除并发压测(sim)。要跑 sim：mvn test -Dgroups=sim -Dtest.excludedGroups= -->
+        <test.excludedGroups>sim</test.excludedGroups>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- MyBatis：手写 SQL + XML Mapper（刻意不用 MyBatis-Plus/JPA，避免掩盖 SQL/索引/锁现象） -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+            <version>${mybatis.starter.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Redis：Stage 5 缓存三件套 / Stage 6 分布式锁 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <!-- Surefire 3.x（由 Spring Boot 父 POM 管理版本）支持 JUnit5 的 -Dgroups=tag 过滤。
+                 注意：这里【不要】设置 <groups>，否则会覆盖命令行的 -Dgroups。
+                 只用 <excludedGroups> 把 sim 默认排除，且用属性包一层以便命令行清空。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*Simulator.java</include>
+                    </includes>
+                    <excludedGroups>${test.excludedGroups}</excludedGroups>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

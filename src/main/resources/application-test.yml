@@ -1,0 +1,15 @@
+# 测试 profile：验收测试连【真实 MySQL】(不用 H2/Testcontainers)。
+# 原因：H2 没有 InnoDB 的间隙锁 / MVCC / EXPLAIN 行为，会教错八股。
+# 跑测试前置：docker compose up -d 且 MySQL healthy。
+# 用法（可选）：@ActiveProfiles("test")；不加也行，默认 profile 已指向同一个库。
+spring:
+  datasource:
+    url: "jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:13306}/${DB_NAME:seckill_lab}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8"
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:bagu1234}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:50}
+
+mybatis:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

@@ -1,0 +1,36 @@
+### ============================================================
+### seckill-lab REST 用例（VS Code REST Client / IDEA .http 可直接点击发送）
+### 前置：应用已 `mvn spring-boot:run` 起在 8080，MySQL 已 docker compose up -d
+### 若应用跑在别处，改下面的 @host 变量即可
+### ============================================================
+
+@host = http://localhost:8080
+
+### 1. 按主键查商品（Stage 0 已实现，应返回 iPhone 秒杀专场，stock=10）
+GET {{host}}/products/1
+
+### 2. 查不存在的商品（应返回 404 + code=404）
+GET {{host}}/products/999999999
+
+### 3. 列出所有商品（Stage 0 已实现；5 万行下这是全表扫描，Stage 1 用它对比优化前后）
+GET {{host}}/products
+
+### 4. 商品搜索：分类 + 上架状态 + 价格区间（Stage 1 工单目标）
+#   Stage 1 完成前：searchProducts 未绑定，会报错（500 / BindingException）
+#   Stage 1 完成后：应返回命中商品，按 price 升序
+GET {{host}}/products/search?categoryId=10&status=1&minPrice=100&maxPrice=5000&limit=20
+
+### 5. 商品搜索：换一组条件（观察 EXPLAIN 是否仍命中索引）
+GET {{host}}/products/search?categoryId=120&status=0&minPrice=50&maxPrice=300&limit=10
+
+### 6. 秒杀下单（Stage 2/3 工单目标）
+#   Stage 0/1：下单逻辑未实现，返回 501 + code=501
+#   Stage 2  ：实现事务后，返回 200 + 订单数据
+#   Stage 3  ：并发下不再超卖（配合 sim 并发模拟器验证）
+POST {{host}}/seckill?userId=1&productId=1
+
+### 7. 秒杀下单：另一个用户抢同一件（Stage 3 观察唯一约束 uk_user_product 与库存扣减）
+POST {{host}}/seckill?userId=2&productId=1
+
+### 8. 秒杀下单：同一用户重复抢（应被 uk_user_product 唯一约束拦住，Stage 2/3 观察）
+POST {{host}}/seckill?userId=1&productId=1

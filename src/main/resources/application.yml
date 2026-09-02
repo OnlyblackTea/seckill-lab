@@ -1,0 +1,36 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: seckill-lab
+  datasource:
+    # 默认连本机(VM 上)由 docker compose 暴露的 MySQL：宿主端口 13306 -> 容器 3306。
+    # 若你在笔记本上跑 App、连远端 VM 的库，设置环境变量 DB_HOST=192.168.1.147 即可。
+    url: "jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:13306}/${DB_NAME:seckill_lab}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8"
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:bagu1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 连接池调大，Stage 3 才能让 100 个并发线程真正并行打到 DB 上复现超卖
+      maximum-pool-size: ${DB_POOL_SIZE:50}
+      minimum-idle: 5
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:16379}
+      timeout: 3000ms
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.devteam.seckill.domain
+  configuration:
+    # 下划线列名 -> 驼峰属性名（category_id -> categoryId）
+    map-underscore-to-camel-case: true
+    # 打开后，未命中索引/慢 SQL 更容易在日志里被发现（学习期建议开启）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+logging:
+  level:
+    com.devteam.seckill: INFO
