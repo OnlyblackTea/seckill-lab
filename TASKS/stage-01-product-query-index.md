@@ -35,8 +35,9 @@ Mapper 接口 `ProductMapper.searchProducts(...)` 已经写好，参数名对得
 
 ### 文件 2：加合适的索引
 
-`src/main/resources/db/migration/V1__stage01_product_search_index.sql` 现在**全是注释**，
-不建任何索引。你要把里面的「幂等加索引」模板取消注释，并把 `(col_a, col_b, col_c)`
+`src/main/resources/db/migration/V1__stage01_product_search_index.sql` 现在除了末尾一条
+无副作用的 `SELECT 1;` 占位（防止 `@Sql` 因「整份脚本全是注释 = 空脚本」而报错）外全是注释，
+**不建任何索引**。你要把里面的「幂等加索引」模板取消注释，并把 `(col_a, col_b, col_c)`
 换成你决定的真实列。**索引名必须叫 `idx_product_search`**（测试按这个名字判断幂等）。
 
 ## 三、关键思考（不给答案，自己想）
