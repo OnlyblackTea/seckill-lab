@@ -25,3 +25,13 @@
 -- EXECUTE stmt;
 -- DEALLOCATE PREPARE stmt;
 -- =============================================================
+
+-- 【RED 占位｜实现前请勿删】
+-- 上面整份脚本全是注释。Spring 的 @Sql 在执行前会剥掉注释，剥完发现脚本为空，
+-- 就会抛 IllegalArgumentException: 'script' must not be null or empty，
+-- 导致 stage01 两个用例都"因脚本为空"在 beforeTestMethod 阶段报错——那不是我们要的"红"。
+-- 下面这条无副作用语句让脚本非空即可绕过该断言：它【不创建任何索引】，
+-- 所以 EXPLAIN 仍走全表扫描(type=ALL) => stage01 依然红，且红在对的地方
+-- （searchProducts 未绑定抛 BindingException + EXPLAIN type=ALL/key=NULL）。
+-- 你实现 Stage 1 时：取消上面"幂等加索引"模板的注释、把 (col_a,col_b,col_c) 换成真实列即可；本行可留可删。
+SELECT 1;
