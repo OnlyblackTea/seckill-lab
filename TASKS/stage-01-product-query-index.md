@@ -1,6 +1,12 @@
 # Stage 1 · 工单：商品搜索查询慢
 
-> 状态：🟥 已派发（验收测试初始为红）· 考点：索引 / 最左前缀 / 覆盖索引 / EXPLAIN / 索引失效
+> 状态：🟥 已派发（验收测试初始为红）· 考点清单见 ticket.yaml 的 `brief.concepts`
+>
+> **本工单的权威契约**：[`stages/stage-01-product-query-index/ticket.yaml`](../stages/stage-01-product-query-index/ticket.yaml)
+> 版本锚点：工单 id `db-stage-01` · `schema_version=1` · `ticket_version=1` · `test_version=1`
+>
+> 本文是给人读的**叙述视图**（线上问题的故事 + 关键思考引导）。**改动面、红绿判据、hints 只在
+> ticket.yaml 里存一份**，本文不复述——两份清单并存迟早悄悄漂移。冲突时以 ticket.yaml 为准。
 
 ## 一、线上问题（工单背景）
 
@@ -15,30 +21,14 @@
 
 ## 二、你要做什么
 
-正好改**两个文件**：
+一句话：正好改**两个文件**——补全 `searchProducts` 的 XML SQL，再给 `product` 表加一个合适的联合索引。
 
-### 文件 1：实现搜索 SQL
+权威定义在 ticket.yaml 的两处，动手前先读：
 
-`src/main/resources/mapper/ProductMapper.xml` 里的 `searchProducts` 现在是**注释掉的占位**，
-所以接口方法未绑定，调用会抛 `BindingException`。取消注释并补全，语义要求：
-
-```
-WHERE category_id = #{categoryId}
-  AND status      = #{status}
-  AND price BETWEEN #{minPrice} AND #{maxPrice}
-ORDER BY price ASC
-LIMIT #{limit}
-```
-
-返回列用 `resultMap="productMap"`（至少含 id,name,category_id,status,price,stock）。
-Mapper 接口 `ProductMapper.searchProducts(...)` 已经写好，参数名对得上，你只需写 XML。
-
-### 文件 2：加合适的索引
-
-`src/main/resources/db/migration/V1__stage01_product_search_index.sql` 现在除了末尾一条
-无副作用的 `SELECT 1;` 占位（防止 `@Sql` 因「整份脚本全是注释 = 空脚本」而报错）外全是注释，
-**不建任何索引**。你要把里面的「幂等加索引」模板取消注释，并把 `(col_a, col_b, col_c)`
-换成你决定的真实列。**索引名必须叫 `idx_product_search`**（测试按这个名字判断幂等）。
+| 要知道什么 | 去 ticket.yaml 哪里看 |
+|---|---|
+| 改哪两个文件（也就是你的改动白名单，改别的算越界） | `scope.files_to_change` |
+| 这两个文件现在是什么状态、要补成什么语义<br>（SQL 形状、`resultMap`、索引名的硬要求） | `brief.problem` |
 
 ## 三、关键思考（不给答案，自己想）
 
@@ -52,53 +42,38 @@ Mapper 接口 `ProductMapper.searchProducts(...)` 已经写好，参数名对得
 
 想清楚这几点，你的索引顺序自然就定了。这是面试最爱问的「联合索引怎么设计」。
 
-## 四、验收标准（测试怎么判你过没过）
-
-跑：
+## 四、怎么验收
 
 ```bash
 mvn test -Dgroups=stage01
 ```
 
-验收测试 `ProductQueryIndexAcceptanceTest` 会：
+**一开始必须是红的**，而且必须红在该红的地方：`searchProducts` 未绑定 + EXPLAIN 全表扫描。
 
-1. **正确性**：插入 5 条 fixture（category=999901），其中 3 条应命中
-   （status=1 且 price∈[5,25]），断言返回恰好 3 条且按 price 升序（5.00 → 10.00 → 20.00）。
-   - 排除项：price=30 超上限、status=0 下架。
-2. **命中索引**：对一条规范化 EXPLAIN 语句断言 `type != ALL` 且 `key` 非空。
+具体判据不在本文重复，去 ticket.yaml 看：
 
-**初始为红的两个原因**（都对应你上面的两个文件）：
-- `searchProducts` 未绑定 → BindingException → 正确性测试失败；
-- 没建索引 → EXPLAIN `type=ALL, key=NULL` → 索引测试失败。
+- `grader.correctness.expect` —— 红/绿各是什么样、fixture 命中几条、以及**哪种红是红错了地方**
+  （迁移脚本若变成「整份全是注释」，`@Sql` 会先抛空脚本错，那不是我们要的红）；
+- `grader.performance.assert` —— EXPLAIN 上硬断言什么。
 
 两个断言都过 = 工单完成 = 测试变绿。
 
-## 五、Hints（卡住再看，别直接看答案）
+## 五、Hints
 
-- **H1**：`@Sql` 会在每次测试方法前自动执行 V1 脚本，所以你改完 SQL 文件直接跑测试即可，
-  不用手动去数据库建索引。脚本是幂等的，重复跑不会报 `Duplicate key name`。
-- **H2**：EXPLAIN 断言用的规范化语句查询形状**和你写的 searchProducts 一致**
-  （等值 category_id + status，范围 price，按 price 升序，LIMIT）。所以你为 searchProducts
-  建的索引，一定能服务这条 EXPLAIN——前提是列顺序设计对了。
-- **H3**：想手动看 EXPLAIN？
-  ```bash
-  docker compose -f docker/docker-compose.yml exec mysql mysql -uroot -pbagu1234 seckill_lab \
-    -e "EXPLAIN SELECT id,name,category_id,status,price,stock FROM product \
-        WHERE category_id=10 AND status=1 AND price BETWEEN 50 AND 200 ORDER BY price ASC LIMIT 20;"
-  ```
-  建索引前后各跑一次，对比 `type` / `key` / `rows` / `Extra` 的变化，这就是你 review 时要给我看的证据。
-- **H4**：如果 EXPLAIN 里 `key=idx_product_search` 但 `Extra` 出现 `Using filesort`，
-  说明你的列顺序没能同时满足过滤和排序——回到「关键思考」第 3 点重排列顺序。
+卡住再看，别直接看答案：**ticket.yaml 的 `hints`**，H1 → H4 阶梯式，越往后越接近答案。
+
+平台版里每展开一条都会计入学习者画像，成为「独立性」评审维度的输入（设计 §11.2）——
+所以现在也建议你先自己想，想不动了再一级级往下开。
 
 ## 六、做完之后
 
-把以下三样贴给导师 review：
-1. 你改后的 `searchProducts` SQL；
-2. 你选的索引列顺序 + 一句话解释为什么这么排；
-3. 建索引**前后**两次 EXPLAIN 的输出对比。
+按 ticket.yaml `submission.template.require` 的**三件套**贴给导师 review。这就是「PR 即答辩」
+（设计 §11.1，本项目的「做完之后三件套」正是它的出处）。
 
-review 通过 → 导师带你过一遍「索引 & 执行计划」八股（见 `docs/数据库八股地图.md` Stage 1）
-→ 解锁 Stage 2（下单事务）。
+review 通过 → 导师带你过一遍「索引 & 执行计划」八股（`docs/数据库八股地图.md` Stage 1，
+即 ticket.yaml 的 `submission.bagu_map_ref`）→ 解锁 Stage 2（下单事务）。
 
-> 参考解在 `solutions` 分支，但**强烈建议先自己做完再看**。你面试时要能讲出自己的思路，
-> 而不是背一个标准答案。
+> 参考解在 `solutions` 分支。ticket.yaml 的 `mentor_policy.mode: mentor_then_reveal` 说的就是这件事：
+> 陪练期导师只给思路、**不代写**（D1：`may_write` 绝不与 `files_to_change` 相交，准入门硬卡），
+> **过关之后**才拿参考解跟你对照「你的解法 vs 参考解」。
+> 强烈建议先自己做完再看——你面试时要能讲出自己的思路，而不是背一个标准答案。
