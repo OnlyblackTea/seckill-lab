@@ -1,0 +1,71 @@
+# track.yaml —— 本仓作为「发卷平台（bagu-trainer）第一个 Track」的机器可读清单。
+#
+# 契约来源（不是本仓自创的格式）：
+#   schema : bagu-trainer/content/schema/track.schema.json（设计 §4.2）
+#   模型   : bagu-trainer/platform_service/models.py::TrackManifest
+#   准入门 : bagu-trainer/platform_service/admission.py::validate_track（设计 §4.6，
+#            即 `paper validate-track`；硬门：schema / files_to_change 存在 / 八股锚点可解析 /
+#            每个已声明 runtime 入口都被 digest_pin 覆盖 / trust_level 背书 / D1 角色反转）
+#
+# 结构上刻意二分（设计 v0.3 的核心取舍）：track 的本质是「一组会在学员设备上执行任意代码的
+# 供应链包」，所以 manifest 是**惰性声明**（平台只读它渲染看板、体检环境，绝不执行），
+# runtime 是**可执行入口**（真在学员机器上跑，是攻击面，因此必须逐个 digest 锁定）。
+#
+# 改完 runtime 指向的任何文件后，重算 pin： bash scripts/digest-pin.sh
+track:
+  id: database-bagu
+  name: 数据库八股实战（秒杀 / 电商下单）
+  language: zh-CN
+
+  # 供应链信任级别（设计 §4.6/§13.2）。self = 自托管、自己写的，默认信任；
+  # 升 verified 需要 contribute.review.signed_by 有维护者背书（准入门会硬卡）。
+  trust_level: self
+
+  # ── manifest：惰性声明式元数据。平台只读，永不执行 ──
+  manifest:
+    requires:                       # 学员设备前置（仅声明；平台据此体检，不代装）
+      java: "17"
+      build: maven
+      docker: "24"
+    skeleton_repo: "."              # 本仓根**就是**骨架仓（设计 §4.1：seckill-lab 即骨架仓）。
+                                    # admission 把它当相对仓根的路径解析，再逐个校验
+                                    # ticket.scope.files_to_change 是否真的存在。
+    bagu_map: "./docs/数据库八股地图.md"   # 过关后讲解锚点（ticket.submission.bagu_map_ref 指向它）
+    stages:                         # 只列**已发布**的 stage（设计 §8 防剧透：未解锁 stage 是
+      - stage-00-onboarding         #   独立 ref，paper enroll 默认不拉）。Stage 2–6 的 🔒 路线
+      - stage-01-product-query-index #  留在 TASKS/README.md 看板里给人看，不进契约。
+                                    # 注：stage-00 是环境入职，**不出 ticket**——理由见 stages/README.md。
+
+  # ── runtime：可执行入口（供应链攻击面）。声明了的每个入口都必须有 digest_pin ──
+  runtime:
+    compose: "./docker/docker-compose.yml"                  # MySQL 8.0@13306 + Redis 7@16379（避开默认端口）
+    build: "./scripts/build.sh"                             # 骨架可构建（准入门 §4.6 的稳定入口）
+    tests: "./src/test/java/com/devteam/seckill/stage*/"    # canonical 验收测试（红→绿判据）
+    sim: "./src/test/java/com/devteam/seckill/sim/"         # 并发模拟器（Stage 3+ 零超卖，设计 §7.5）
+    # 迁移注记（设计 §7.3）：canonical 测试最终应移出考卷仓的 src/test（那里只留冒烟测试占位），
+    # 由 `paper grade` 运行时从学员 PR 改不到的来源注入。paper-cli 尚未实现，故 tests/sim 暂时
+    # 指向现有路径；迁移时只需改上面两行 + 重跑 scripts/digest-pin.sh，ticket.yaml 的
+    # grader.correctness.canonical_test 同步改路径即可。
+    # 由 scripts/digest-pin.sh 生成（配方见该脚本头部注释）；改完 runtime 指向的文件就重跑一次。
+    digest_pin:
+      compose: "sha256:ba0aaec8d4b14857e1f6f13b5f8a8aa328c8257b2927f86e59d61975513f84e5"
+      build: "sha256:3d215d58d6991ca47955ce010d550add3c53dae78982e23c1fce7b0e6dd32864"
+      tests: "sha256:7b7e2a1b28fc8901ac052eef30561e59e095fbfe0f3af180496f5a2fbed2488f"
+      sim: "sha256:65295a0657c68c42797487aaf7dc471339824e42d3d30e758c4c8e8813a36a0e"
+      # 下面两个是**镜像**摘要（不是文件摘要），取自实际拉过镜像的机器：
+      #   docker image inspect --format '{{.RepoTags}} -> {{.RepoDigests}}' mysql:8.0 redis:7
+      # 取值环境：VM 192.168.1.147（linux/amd64），2026-09-09。
+      # 为什么要 pin：compose 里写的是 `mysql:8.0` 这种**会漂的 tag**（8.0.x 补丁版随时间变），
+      # digest 才锁得住「学员跑起来的到底是哪个镜像」。注意 digest 与架构绑定——arm64 机器
+      # 拉到的多架构 manifest 会给出不同 digest，届时按本机 `digest-pin.sh` 输出更新即可。
+      mysql: "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b"   # mysql:8.0
+      redis: "sha256:71da9275c5f3fcb97d0fa0c8c5b36cc995327265420f17a04bfd544f458059f7"   # redis:7
+
+  # ── contribute：内容仓的许可与背书（设计 §6.7 三层许可拓扑：内容 MIT / 引擎 GPL / 平台 Apache）──
+  contribute:
+    license: MIT
+    maintainers:
+      - "@OnlyblackTea"
+    review:
+      ci: paper validate-track      # 准入门命令（CI 强制）
+      signed_by: []                 # trust_level=self 不需要背书；升 verified 时必填

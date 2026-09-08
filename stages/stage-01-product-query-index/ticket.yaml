@@ -1,0 +1,123 @@
+# ticket.yaml —— Stage 1 工单的**机器可读权威契约**。
+#
+# 契约来源（不是本仓自创的格式）：
+#   schema : bagu-trainer/content/schema/ticket.schema.json（设计 §4.3）
+#   模型   : bagu-trainer/platform_service/models.py::TicketSpec
+#   准入门 : bagu-trainer/platform_service/admission.py::validate_track
+#            （硬门会校验：schema 合法、scope.files_to_change 在骨架里真的存在、
+#              submission.bagu_map_ref 的锚点在 bagu_map 里能解析、
+#              D1 —— mentor_policy.may_write 绝不与 scope.files_to_change 相交）
+#
+# 八个 concern 各管一件事，互不串味：identity(身份+版本锚点) / brief(题面) / scope(改动面) /
+# grader(红绿判据) / hints(阶梯提示) / submission(PR 即答辩) / mentor_policy(导师权限) /
+# progression(解锁依赖)。平台的 AI 经理**只拿这份文件**发卷，所以 brief.problem 必须自足。
+#
+# 学习者读的叙述版（线上问题的故事、「关键思考」四问）在
+#   TASKS/stage-01-product-query-index.md
+# 两者冲突时**以本文件为准**；本文件改了判据/题面要 bump identity.ticket_version（旧 Instance 失效，§9.2）。
+
+# ── identity：身份 + 版本锚点（发卷时钉进 TicketInstance，回答「这 PR 基于哪个版本」，§9.1）──
+identity:
+  id: db-stage-01
+  schema_version: 1                 # ticket.yaml 结构版本（schema 演进用）
+  ticket_version: 1                 # 本工单内容版本；改题面/判据 → bump → 旧 Instance 变 stale
+  stage: 1
+  title: 商品搜索查询慢
+
+# ── brief：题面（自足，AI 经理据此发卷）──
+brief:
+  problem: |
+    【线上问题｜来自：商品组 · 优先级 P1】
+    运营反馈：商品列表页的「按分类 + 上架状态 + 价格区间」搜索越来越慢。product 表现在有
+    5 万多行，每次搜索都卡。DBA 看了一眼说：「你们这查询走的是全表扫描，一个合适的索引都没有。」
+    请你排查并优化，并用 EXPLAIN 证明索引真的被用上了。
+
+    这不是编的——本骨架的 product 表**故意只建了主键、没有任何二级索引**，所以带
+    WHERE category_id / status / price 的查询必然全表扫描。
+
+    【你要做什么｜正好改两个文件（就是 scope.files_to_change 那两个）】
+    1) src/main/resources/mapper/ProductMapper.xml
+       里面的 searchProducts 现在是**注释掉的占位**（接口方法未绑定，调用抛 BindingException）。
+       取消注释并补全，语义要求：
+         WHERE category_id = #{categoryId}
+           AND status      = #{status}
+           AND price BETWEEN #{minPrice} AND #{maxPrice}
+         ORDER BY price ASC
+         LIMIT #{limit}
+       返回列用 resultMap="productMap"（至少含 id, name, category_id, status, price, stock）。
+       Mapper 接口 ProductMapper.searchProducts(...) 已经写好、参数名对得上，你只需写 XML。
+    2) src/main/resources/db/migration/V1__stage01_product_search_index.sql
+       除末尾一条无副作用的 SELECT 1; 占位（防止 Spring @Sql 因「整份脚本全是注释 = 空脚本」
+       而报 IllegalArgumentException）外全是注释，不建任何索引。把里面的「幂等加索引」模板
+       取消注释，并把 (col_a, col_b, col_c) 换成你决定的真实列。
+       **索引名必须叫 idx_product_search**（测试按这个名字判断幂等）。
+  concepts: [索引, 最左前缀, 覆盖索引, EXPLAIN, 索引失效]
+
+# ── scope：限定改动面（驱动评审与越界检测，§7.3）。D1：AI 导师绝不写这两个文件 ──
+scope:
+  files_to_change:
+    - src/main/resources/mapper/ProductMapper.xml
+    - src/main/resources/db/migration/V1__stage01_product_search_index.sql
+
+# ── grader：客观红绿判据，在学员设备上本地跑；其结果按「不可信证据」处理（§7.4）──
+grader:
+  correctness:
+    test_group: stage01              # 运行：mvn test -Dgroups=stage01
+    test_version: 1                  # canonical 测试版本；与 ticket_version 一起钉进 Instance
+    canonical_test: src/test/java/com/devteam/seckill/stage01/ProductQueryIndexAcceptanceTest.java
+    expect: |-
+      初始为【红】，且必须红在这两个原因上（已在 VM 实测：Tests run: 2, Failures: 1, Errors: 1）：
+        ① searchProducts 未绑定 → BindingException: Invalid bound statement (not found) → 正确性用例失败；
+        ② 没建索引 → EXPLAIN type=ALL / key=null / rows=50063 / Extra=Using where; Using filesort → 索引用例失败。
+      改对后为【绿】：
+        ① 正确性：插入 5 条 fixture（category_id=999901），其中 3 条命中（status=1 且 price∈[5,25]），
+           断言恰好返回 3 条且按 price 升序（5.00 → 10.00 → 20.00）；
+           排除项：price=30 超上限、status=0 已下架。
+        ② 索引：对一条规范化 EXPLAIN 语句断言 type != ALL 且 key 非空。
+      注：迁移脚本若变成「整份全是注释」，@Sql 会在 beforeTestMethod 阶段抛
+      'script' must not be null or empty —— 那是红在**错误的地方**，不算数（末尾的 SELECT 1; 就是为此留的）。
+  performance:
+    type: explain
+    # 只硬断言 canonical 测试真正检查的两条。Extra 里的 Using filesort 是 H4 的**排错信号**
+    # （列序没同时满足过滤与排序），刻意不升格为判据：教学提示与红绿门要分得清。
+    assert: "type != 'ALL' && key != null"
+  concurrency: null                  # Stage 3+ 才有（零超卖 sim，§7.5）
+
+# ── hints：阶梯式提示，默认折叠；展开一条会计入学习者画像（§10）──
+hints:
+  - id: H1
+    text: "@Sql 会在每次测试方法前自动执行 V1 脚本，所以你改完 SQL 文件直接跑测试即可，不用手动去数据库建索引。脚本是幂等的，重复跑不会报 Duplicate key name。"
+  - id: H2
+    text: "EXPLAIN 断言用的规范化语句，查询形状和你写的 searchProducts 一致（等值 category_id + status，范围 price，按 price 升序，LIMIT）。所以你为 searchProducts 建的索引一定能服务这条 EXPLAIN——前提是列顺序设计对了。"
+  - id: H3
+    text: |-
+      想手动看 EXPLAIN？
+        docker compose -f docker/docker-compose.yml exec mysql mysql -uroot -pbagu1234 seckill_lab \
+          -e "EXPLAIN SELECT id,name,category_id,status,price,stock FROM product \
+              WHERE category_id=10 AND status=1 AND price BETWEEN 50 AND 200 ORDER BY price ASC LIMIT 20;"
+      建索引前后各跑一次，对比 type / key / rows / Extra 的变化——这就是你答辩时要给的证据。
+  - id: H4
+    text: "如果 EXPLAIN 里 key=idx_product_search 但 Extra 出现 Using filesort，说明你的列顺序没能同时满足过滤和排序——回到「最左前缀」重排列顺序：等值列在前，范围/排序列在后。"
+
+# ── submission：PR 即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
+submission:
+  template:
+    require:
+      - 改后的 searchProducts SQL
+      - 索引列序 + 一句话解释为什么这么排
+      - 建索引前后两次 EXPLAIN 的输出对比
+  # 锚点由 admission._github_anchor 实算：标题里的 · 和 & 被丢弃 → 双横线；
+  # 结尾的 🟥 被丢弃 → **尾部还留一个连字符**。手写必错，改标题就要重算。
+  bagu_map_ref: "docs/数据库八股地图.md#stage-1--索引--执行计划-"
+
+# ── mentor_policy：导师权限（§6.4）。D1 角色反转的硬约束 ──
+mentor_policy:
+  mode: mentor_then_reveal           # 陪练期只给思路不代写；**过关后**才对照 solutions 分支的参考解（§8）
+  may_write: []                      # 导师在本仓无可写文件；绝不碰 scope.files_to_change（D1，准入门硬卡）
+
+# ── progression：解锁依赖（v0.3 反转——声明「我依赖谁」而非「我解锁谁」，整体构成 DAG，§9.2）──
+progression:
+  # 空 = DAG 根节点，发卷即 available。stage-00（环境入职）**不出 ticket**：
+  # 它不改任何文件（schema 要求 files_to_change 至少一项），且其冒烟测试在骨架上天生就是绿的，
+  # 不满足 §4.6 的判别性（骨架红 / 参考解绿）。详见 stages/README.md。
+  prerequisites: []

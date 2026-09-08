@@ -1,0 +1,9 @@
+# 让工作树字节跨平台稳定 —— track.yaml 的 digest_pin 是对文件内容取的摘要，
+# 若 Windows 检出成 CRLF、Linux 是 LF，同一份内容会算出不同 pin（本仓 core.autocrlf=true）。
+* text=auto eol=lf
+
+# 明确的二进制/例外（避免被当文本归一化）
+*.png binary
+*.jpg binary
+*.gif binary
+*.jar binary
