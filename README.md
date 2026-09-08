@@ -126,19 +126,36 @@ Stage 1 的参考解只存在于 **`solutions` 分支**，**绝不进 `main`**�
 6 道硬门（schema / files_to_change / bagu_map_anchor / runtime_pinned / trust_level /
 d1_role_reversal）全 PASS，`no_spoiler` 软 PASS（参考解在分支上，仓内无 `solutions/` 目录可扫）。
 
-⚠️ **尚未被验证到的一项**：准入门里的「判别性绿」——即在 `solutions` 分支上跑
-`mvn test -Dgroups=stage01` 应当**变绿**。该分支至今没在 VM 上实跑过，所以 `discriminance`
-一项目前只能是 `skipped`。**在补上这条证据之前，不声称本 Track 已完整通过准入门。**
+✅ **判别性（设计 §4.6）已实测**：同一套 canonical 测试在两个 ref 上跑出了相反的结果——
+
+| ref | `mvn test -Dgroups=stage01` | 结论 |
+|---|---|---|
+| `main`（骨架） | `exit=1` · Tests run: 2, **Failures: 1, Errors: 1** | 红 —— 该红 |
+| `solutions`（参考解） | `exit=0` · Tests run: 2, **Failures: 0, Errors: 0** | 绿 —— 该绿 |
+
+这正是准入门 `discriminance` 要求的形状：测试**能区分**「没做」和「做对了」，而不是恒红或恒绿
+（恒红的卷子会冤枉做对的人，恒绿的卷子会放过没做的人）。在此之前该项只能是 `skipped`
+（没注入 runner），现已用真 mvn 补齐证据。
+
+> 跑法：`git worktree add /tmp/seckill-sol solutions` 后在 worktree 里执行测试，
+> **主工作树全程没被切换过**——参考解不会被检出到学习者眼前，防剧透不破。
+> `solutions` 分支只在本地与 VM 之间流转，**没有推到 GitHub**（`origin` 上只有 `main`）。
 
 ---
 
-> **状态说明（诚实版）**：Stage 0 骨架已在 VM 上实跑，`mvn test -Dgroups=stage00` **全绿**
-> （Tests run: 3, Failures: 0, Errors: 0）；Stage 1 验收测试已实跑并确认**红在正确的地方**
-> （Tests run: 2, Failures: 1, Errors: 1 —— `BindingException: searchProducts 未绑定`
-> \+ EXPLAIN `type=ALL / key=null / rows=50063 / Using where; Using filesort`）。
-> `track.yaml` 的 `digest_pin` 六个值全是真值：四个文件类 pin 由 `scripts/digest-pin.sh`
-> 算出（LF 归一化后的 Merkle 树摘要），`mysql` / `redis` 两个镜像 pin 取自 VM 上
-> `docker image inspect` 的实际 RepoDigest（linux/amd64，2026-09-09）。
+> **状态说明（全部为 VM 实测，不是推断）** · 环境：VM 192.168.1.147（linux/amd64）· 2026-09-09
+>
+> - **Stage 0 骨架**：`mvn test -Dgroups=stage00` 全绿（Tests run: 3, Failures: 0, Errors: 0）。
+> - **Stage 1 骨架**：红在正确的地方（Tests run: 2, Failures: 1, Errors: 1 ——
+>   `BindingException: searchProducts 未绑定` + EXPLAIN `type=ALL / key=null / rows=50063 /
+>   Using where; Using filesort`）。**Stage 1 参考解**：绿（见上表）。
+> - **契约落地零回归**：`pom.xml` 与 `src/test` 一行未动；VM `git pull` 到本次新增的契约文件后，
+>   上面那两条红/绿完全复现（`create mode 100755` 也说明脚本可执行位穿过了 GitHub 往返没丢）。
+> - **`digest_pin` 跨平台可复现**：`scripts/digest-pin.sh` 在 Linux(VM) 上打出的六个 pin，与
+>   Windows 上算出并写进 `track.yaml` 的**逐字相同**。这验证了 `.gitattributes` 钉 `eol=lf`
+>   \+ 脚本内 CRLF 归一化这两道保险是有效的——本仓 `core.autocrlf=true`，不做归一化的话
+>   同一份内容在两个平台会算出不同 pin，pin 就失去意义。四个文件类 pin 是 LF 归一化后的
+>   Merkle 式树摘要；`mysql` / `redis` 两个是 VM 上 `docker image inspect` 的真实 RepoDigest。
 
 ---
 
