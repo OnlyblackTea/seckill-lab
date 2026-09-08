@@ -48,8 +48,8 @@ mvn test -Dgroups=stage00
 
 | Stage | 工单 | 八股考点 | 状态 |
 |-------|------|---------|------|
-| 0 | 入职：拉起环境与骨架 | — | ✅ 骨架已交付 |
-| 1 | 商品查询慢 → 写查询 + 加索引 + EXPLAIN | 索引/最左前缀/覆盖索引/EXPLAIN/索引失效 | 🟥 已派发 |
+| 0 | 入职：拉起环境与骨架 | — | ✅ 已交付（VM 实测绿） |
+| 1 | 商品查询慢 → 写查询 + 加索引 + EXPLAIN | 索引/最左前缀/覆盖索引/EXPLAIN/索引失效 | 🟥 已派发（VM 实测正确红） |
 | 2 | 扣库存+建订单要原子 | ACID/传播/回滚/@Transactional | 🔒 待解锁 |
 | 3 | 高并发超卖了！ | 行锁/乐观vs悲观/丢失更新 | 🔒 待解锁 |
 | 4 | 对账读到脏数据/不一致 | 四隔离级别/MVCC/ReadView | 🔒 待解锁 |
@@ -63,13 +63,20 @@ mvn test -Dgroups=stage00
 
 ```
 seckill-lab/
+├─ track.yaml         ★Track 清单（发卷平台契约）：manifest 惰性声明 + runtime 可执行入口 + digest_pin
+├─ stages/            ★工单契约：stage-01-product-query-index/ticket.yaml（机器可读，权威源）
+├─ scripts/           ★build.sh（准入门的骨架构建入口）· digest-pin.sh（重算 digest_pin）
+├─ .gitattributes     ★强制 LF 检出——digest_pin 对文件内容取摘要，CRLF/LF 漂移会算出不同 pin
 ├─ docker/            MySQL(13306)+Redis(16379) compose、my.cnf、建表/种子脚本
-├─ docs/              新手开发参考 · 架构与约定 · 数据库八股地图
-├─ TASKS/             工单：路线图 + stage-00 + stage-01（Stage 2+ 待解锁）
+├─ docs/              新手开发参考 · 架构与约定 · 数据库八股地图（= track.yaml 的 bagu_map）
+├─ TASKS/             工单叙述版：路线图看板 + stage-00 + stage-01（Stage 2+ 待解锁）
 ├─ sim/               requests.http 手动用例 + 并发模拟器说明
 ├─ src/main/          应用代码（controller→service→mapper→XML）+ resources(配置/Mapper/迁移)
 └─ src/test/          SmokeTest(stage00) · stage01 验收 · sim 并发模拟器
 ```
+
+> ★ = 发卷平台（bagu-trainer）的 Track 契约文件，见下面「本仓是发卷平台的第一个 Track」。
+> 它们不影响你写代码、跑测试；学习者日常只需读 `TASKS/`，只是**事实以 `stages/*/ticket.yaml` 为准**。
 
 分层与命名规范见 [`docs/架构与约定.md`](docs/架构与约定.md)。
 
@@ -90,11 +97,48 @@ mvn test                                     # 全部（sim 默认排除）
 Stage 1 的参考解只存在于 **`solutions` 分支**，**绝不进 `main`**（防剧透）。
 强烈建议先自己做完、review 通过后再对照参考解。你面试时要能讲出**自己的思路**。
 
+> 这一约定在 Track 契约里的表达是 `ticket.yaml` 的 `mentor_policy.mode: mentor_then_reveal`
+> （导师只讲解、不代写：`may_write: []`，与 `scope.files_to_change` 天然不相交）。
+
+## 本仓是发卷平台的第一个 Track
+
+[`bagu-trainer`](../bagu-trainer) 是「发卷平台」（学习者做卷子、AI 当考官/导师、平台本地阅卷）。
+本仓就是它设计文档 §3 / §4.1 点名的 **第一个 Track：数据库八股**——骨架仓即本仓自身
+（`track.yaml` 里 `manifest.skeleton_repo: "."`）。
+
+契约映射（设计文档附录 B 的落地）：
+
+| 本仓现状 | Track 契约落点 |
+|---|---|
+| 本仓根目录（Spring Boot 工程） | `track.yaml` → `manifest.skeleton_repo: "."` |
+| `TASKS/stage-01-product-query-index.md` | `stages/stage-01-product-query-index/ticket.yaml`（**权威源**，md 是叙述视图） |
+| `TASKS/stage-00-onboarding.md` | 不出 ticket（入职不改代码），理由见 [`stages/README.md`](stages/README.md) |
+| `mvn test -Dgroups=stage01` | `ticket.yaml` → `grader.correctness.test_group` + `test_version` |
+| `src/test/.../stage01/ProductQueryIndexAcceptanceTest.java` | `grader.correctness.canonical_test` + `track.yaml` → `runtime.tests` |
+| `src/test/.../sim/SeckillLoadSimulator.java` | `track.yaml` → `runtime.sim`（Stage 3 超卖仿真用） |
+| `docker/docker-compose.yml` | `runtime.compose` + `digest_pin` |
+| `docs/数据库八股地图.md` | `manifest.bagu_map` + `submission.bagu_map_ref`（带 GitHub 锚点） |
+| `docs/架构与约定.md` | 代码质量评审依据（设计文档 §11.2） |
+| `solutions` 分支 | `mentor_policy.mode: mentor_then_reveal` |
+
+准入命令：`paper validate-track`（paper-cli 目前只有脚手架，实际用平台侧
+`platform_service.admission.validate_track()` 这道门）。**当前实测结果：`ok = True`**，
+6 道硬门（schema / files_to_change / bagu_map_anchor / runtime_pinned / trust_level /
+d1_role_reversal）全 PASS，`no_spoiler` 软 PASS（参考解在分支上，仓内无 `solutions/` 目录可扫）。
+
+⚠️ **尚未被验证到的一项**：准入门里的「判别性绿」——即在 `solutions` 分支上跑
+`mvn test -Dgroups=stage01` 应当**变绿**。该分支至今没在 VM 上实跑过，所以 `discriminance`
+一项目前只能是 `skipped`。**在补上这条证据之前，不声称本 Track 已完整通过准入门。**
+
 ---
 
-> 状态说明：本仓库的 Stage 0 骨架、文档、Stage 1 工单与验收测试均已交付。
-> 由于开发机未装 JDK/Maven、且导师无 VM shell 权限，**代码尚未经过编译/运行验证**；
-> 你在 VM 上按「快速开始」跑通后，把输出反馈给导师，进入正式的「验证闭环」。
+> **状态说明（诚实版）**：Stage 0 骨架已在 VM 上实跑，`mvn test -Dgroups=stage00` **全绿**
+> （Tests run: 3, Failures: 0, Errors: 0）；Stage 1 验收测试已实跑并确认**红在正确的地方**
+> （Tests run: 2, Failures: 1, Errors: 1 —— `BindingException: searchProducts 未绑定`
+> \+ EXPLAIN `type=ALL / key=null / rows=50063 / Using where; Using filesort`）。
+> `track.yaml` 的 `digest_pin` 六个值全是真值：四个文件类 pin 由 `scripts/digest-pin.sh`
+> 算出（LF 归一化后的 Merkle 树摘要），`mysql` / `redis` 两个镜像 pin 取自 VM 上
+> `docker image inspect` 的实际 RepoDigest（linux/amd64，2026-09-09）。
 
 ---
 
