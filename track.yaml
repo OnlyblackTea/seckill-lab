@@ -42,6 +42,17 @@ track:
     build: "./scripts/build.sh"                             # 骨架可构建（准入门 §4.6 的稳定入口）
     tests: "./src/test/java/com/devteam/seckill/stage*/"    # canonical 验收测试（红→绿判据）
     sim: "./src/test/java/com/devteam/seckill/sim/"         # 并发模拟器（Stage 3+ 零超卖，设计 §7.5）
+
+    # 判定面（设计 §11.3）：**改了这些 = 动了判定，验收门直接 fail**（不管红绿）。
+    # 为什么必须有：设计 §7.3 的"canonical 测试运行时注入"还没实现，测试此刻就躺在学员
+    # 的工作区里——不声明这一项，"把测试改成永远绿"就是一条免费通道。
+    # 只放"判定所依赖的东西"：测试、构建配置、基础设施；学员要改的业务文件不在其中。
+    protected_paths:
+      - "./src/test/"          # canonical 测试 + fixture（改了就是改判据）
+      - "./pom.xml"            # 构建配置（可以拿它跳过测试）
+      - "./scripts/"           # build.sh / digest-pin.sh
+      - "./docker/"            # compose 与 mysql/redis 配置（可以拿它弱化环境）
+
     # 迁移注记（设计 §7.3）：canonical 测试最终应移出考卷仓的 src/test（那里只留冒烟测试占位），
     # 由 `paper grade` 运行时从学员 PR 改不到的来源注入。paper-cli 尚未实现，故 tests/sim 暂时
     # 指向现有路径；迁移时只需改上面两行 + 重跑 scripts/digest-pin.sh，ticket.yaml 的
