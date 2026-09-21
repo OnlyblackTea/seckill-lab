@@ -59,7 +59,7 @@ track:
     # grader.correctness.canonical_test 同步改路径即可。
     # 由 scripts/digest-pin.sh 生成（配方见该脚本头部注释）；改完 runtime 指向的文件就重跑一次。
     digest_pin:
-      compose: "sha256:ba0aaec8d4b14857e1f6f13b5f8a8aa328c8257b2927f86e59d61975513f84e5"
+      compose: "sha256:ebaf7881f22ba38978b9a894f5a72a60dc399aedaf67be7a659582885a57e69f"
       build: "sha256:3d215d58d6991ca47955ce010d550add3c53dae78982e23c1fce7b0e6dd32864"
       tests: "sha256:7b7e2a1b28fc8901ac052eef30561e59e095fbfe0f3af180496f5a2fbed2488f"
       sim: "sha256:65295a0657c68c42797487aaf7dc471339824e42d3d30e758c4c8e8813a36a0e"

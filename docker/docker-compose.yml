@@ -23,7 +23,12 @@ services:
       - ./mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pbagu1234"]
+      # 必须用 127.0.0.1（强制走 TCP）而**不是** localhost：`-h localhost` 会走 unix socket，
+      # 而 entrypoint 初始化期间的**临时** mysqld 也在同一个 socket 上应答。于是容器会在
+      # "还在跑 init 脚本、TCP 尚未就绪"时就报 healthy —— 任何此刻连上来的客户端都会被
+      # 掐断（实测症状：`Communications link failure` / `EOFException`，且 init 要跑 ~80s：
+      # 5 万行种子 + ANALYZE）。健康检查必须代表"**可连接**"，不是"进程还在"。
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pbagu1234"]
       interval: 5s
       timeout: 5s
       retries: 20
