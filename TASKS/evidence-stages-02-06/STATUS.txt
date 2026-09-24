@@ -4,13 +4,19 @@
 > 命令（每轮先 `docker compose down -v` 重置数据卷与种子）：
 >   mvn -B -Dgroups=stage00,stage01,stage02,stage03,stage04,stage05,stage06,sim -Dtest.excludedGroups= test
 > 原始日志：mvn-all-skeleton.log / mvn-all-solutions.log（本目录，最后一轮实跑）
+>
+> **被测对象 = 提交后的 ref 本身**：两棵树用
+> `git -c core.autocrlf=false archive --prefix=seckill-lab/ <ref>` 打出来（绕开工作区可能有的一切本地残留），
+> 归档摘要：`main` = `c58e4ac1fb2d9a400ff753fa3d0823fb33a3d1309a602cd43d3c5074ed0b687b`，
+> `solutions` = `d1a20adb49ac8a9bd2d69ab13a7184961d893abb2cfaca60966f4cd485ab6340`。
+> 也就是说：下面这两组红/绿，是 `main` 与 `solutions` 这两个**提交**跑出来的，不是某个工作区快照。
 
 ## main（骨架）—— stage 0/1 绿，stage 2–6 红在各自缺陷上
 
 ```
 tests_run_total = 26
-failures        = 6
-errors          = 14
+failures        = 5
+errors          = 13
 build           = FAILURE
 
 stage00 SmokeTest                          run=3 failures=0 errors=0   PASS
@@ -22,6 +28,11 @@ stage05 ProductCacheAcceptanceTest         run=6 failures=1 errors=4   FAIL   �
 stage06 DistributedLockAcceptanceTest      run=4 failures=1 errors=3   FAIL   锁未实现
 sim    SeckillLoadSimulator                run=1 failures=1 errors=0   FAIL   零超卖判据不成立
 ```
+
+> 骨架的失败总数在不同轮次会在 `6 failures / 14 errors` 与 `5 failures / 13 errors` 之间微抖：
+> 唯一"看时序"的用例是 stage02 的 `soldOut_doesNotGoNegative_andLeavesNoOrder`
+> ——它连下 5 单再下一单，在"无事务 + 先读后写"的骨架上偶尔会因并发写覆盖而断言失败（fail）而不是抛错（error）。
+> **判据本身不受影响**：stage02 无论哪一轮都红，且红在"库存 / 订单数对不上"这条线上。
 
 关键判据原文：
 
