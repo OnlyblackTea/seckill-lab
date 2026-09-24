@@ -25,30 +25,87 @@
         WHERE id = #{id}
     </select>
 
+    <!-- 按主键查询（与 selectById 同义，供业务层按语义选用） -->
+    <select id="findById" resultMap="productMap">
+        SELECT <include refid="baseColumns"/>
+        FROM product
+        WHERE id = #{id}
+    </select>
+
     <!-- Stage 0：全表查询（已实现）。大表下这是全表扫描，Stage 1 用它对比优化前后。 -->
     <select id="selectAll" resultMap="productMap">
         SELECT <include refid="baseColumns"/>
         FROM product
     </select>
 
-    <!-- ============================================================
-         Stage 1：searchProducts —— 按「分类 + 上架状态 + 价格区间」搜索
-
-         索引 idx_product_search (category_id, status, price) 的设计：
-           * category_id / status 是等值谓词（=）→ 放最左，先把索引区间收窄；
-           * price 既是范围谓词（BETWEEN）又是 ORDER BY 列 → 放最后。
-             联合索引在等值前缀确定后，后续列天然有序，所以 price 范围扫描
-             出来的顺序就是 price 升序，ORDER BY price ASC 直接复用索引顺序，
-             既不回表排序、也不产生 Using filesort。
-         ============================================================ -->
-    <select id="searchProducts" resultMap="productMap">
-        SELECT <include refid="baseColumns"/>
-        FROM product
-        WHERE category_id = #{categoryId}
-          AND status      = #{status}
-          AND price BETWEEN #{minPrice} AND #{maxPrice}
-        ORDER BY price ASC
-        LIMIT #{limit}
+    <!-- 查询库存：Stage 2 验回滚、Stage 3 验不超卖、Stage 4 观察快照读 vs 当前读，都用它 -->
+    <select id="selectStock" resultType="java.lang.Integer">
+        SELECT stock FROM product WHERE id = #{id}
     </select>
 
+    <!-- ============================================================
+         Stage 1（你来实现）：searchProducts
+         ============================================================
+         需求：WHERE category_id = #{categoryId}
+                 AND status      = #{status}
+                 AND price BETWEEN #{minPrice} AND #{maxPrice}
+               ORDER BY price ASC
+               LIMIT #{limit}
+         返回列：至少包含 id,name,category_id,status,price,stock（resultMap=productMap）
+
+         现在这里是【注释掉的占位】，所以接口方法未绑定，调用会抛 BindingException，
+         Stage 1 验收测试因此"初始红"。请把下面的注释去掉并补全 SQL：
+
+         <select id="searchProducts" resultMap="productMap">
+             SELECT <include refid="baseColumns"/>
+             FROM product
+             WHERE ...
+             ORDER BY ...
+             LIMIT #{limit}
+         </select>
+
+         提示：写完 SQL 只是第一步，还要在
+         src/main/resources/db/migration/V1__stage01_product_search_index.sql
+         里加合适的索引，并用 EXPLAIN 证明命中（type=ref/range，而非 ALL）。
+         ============================================================ -->
+
+    <!-- ============================================================
+         Stage 2/3（你来实现）：decrementStock —— 原子扣减一件库存
+         ============================================================
+         为什么"判断够不够"和"扣减"必须写成同一条 UPDATE：
+           UPDATE 会对该行加排他锁，并基于【最新已提交版本】重新求值 WHERE（当前读），
+           所以并发请求被行锁串行化，"读-判断-写"之间不再有窗口 —— 这是不超卖的根因。
+         反面写法（骨架里原样保留在 service 层给你对照）：
+           先 selectStock 拿到 10 → 应用里判断 > 0 → 再 UPDATE ... SET stock = 10 - 1，
+           两个并发线程可能都读到 10，各扣一次 → 丢失更新 → 超卖。
+
+         请把下面的占位补全（返回受影响行数：1=扣减成功，0=库存不足）：
+
+         <update id="decrementStock">
+             UPDATE product
+             SET stock = stock - 1
+             WHERE id = #{id}
+               AND stock > 0
+         </update>
+         ============================================================ -->
+
+    <!-- ============================================================
+         乐观锁路线（可选）：带 version 的 CAS 扣减。
+         返回 0 说明 version 已被别的线程改过，需要在 service 层重试。
+         想走乐观锁就把下面的占位补全：
+         <update id="decrementStockOptimistic">
+             UPDATE product
+             SET stock = stock - 1, version = version + 1
+             WHERE id = #{id} AND version = #{version} AND stock > 0
+         </update>
+         ============================================================ -->
+
+    <!-- 骨架里现存的"先读后写"式扣减（反面教材）：只负责把库存写成指定值，没有 stock > 0 守卫、
+         也不是原子操作。调用方必须先 selectStock 读、应用里判断、再调它写回 ——
+         "读-判断-写"之间的窗口就是超卖的根源（丢失更新）。Stage 3 要改掉它。 -->
+    <update id="updateStock">
+        UPDATE product
+        SET stock = #{stock}
+        WHERE id = #{id}
+    </update>
 </mapper>

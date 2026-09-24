@@ -1,0 +1,35 @@
+re-extracted and CRLF-normalized
+compose_up_exit=0
+seed_count=50008
+PONG
+compile_exit=0
+[INFO] BUILD SUCCESS
+stage00: exit=0 | [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
+stage01: exit=0 | [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
+stage02: exit=0 | [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
+stage03: exit=0 | [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
+stage04: exit=0 | [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
+stage05: exit=0 | [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
+stage06: exit=0 | [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
+sim: exit=0
+成功下单 (200)    = 10
+售罄 (410)        = 90
+最终库存          = 0
+落库订单数        = 10
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.433 s -- in com.devteam.seckill.sim.SeckillLoadSimulator
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+== stage00 ==
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.545 s -- in com.devteam.seckill.SmokeTest
+== stage01 ==
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.398 s -- in com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest
+== stage02 ==
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.560 s -- in com.devteam.seckill.stage02.SeckillTransactionAcceptanceTest
+== stage03 ==
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.450 s -- in com.devteam.seckill.stage03.OversellPreventionAcceptanceTest
+== stage04 ==
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.550 s -- in com.devteam.seckill.stage04.IsolationLevelAcceptanceTest
+== stage05 ==
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.843 s -- in com.devteam.seckill.stage05.ProductCacheAcceptanceTest
+== stage06 ==
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.091 s -- in com.devteam.seckill.stage06.DistributedLockAcceptanceTest

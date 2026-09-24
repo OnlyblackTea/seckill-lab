@@ -16,11 +16,11 @@
 |-------|------|---------|------|------|
 | 0 | [入职：拉起环境与骨架](stage-00-onboarding.md) | — | `mvn test -Dgroups=stage00` 绿 | ✅ 已完成（VM 实测绿） |
 | 1 | [商品查询与索引](stage-01-product-query-index.md)<br>契约 `db-stage-01` | 索引/最左前缀/覆盖索引/EXPLAIN/索引失效 | `mvn test -Dgroups=stage01` 绿 | ✅ 已完成（证据 [`evidence-stage-01/`](evidence-stage-01/REPORT.md)） |
-| 2 | 下单事务 | ACID/传播/回滚/@Transactional | 🔒 待解锁 |
-| 3 | 超卖与锁 | 行锁/乐观vs悲观/丢失更新 | `mvn test -Dgroups=sim` 零超卖 | 🔒 待解锁 |
-| 4 | 隔离级别与 MVCC | 四隔离级别/ReadView/快照读vs当前读 | 🔒 待解锁 |
-| 5 | 缓存三件套 | 穿透/击穿/雪崩/缓存一致性 | 🔒 待解锁 |
-| 6 | 死锁与分布式锁（选修） | 间隙锁/Next-Key/死锁排查/SET NX PX | 🔒 待解锁 |
+| 2 | [下单事务要原子](stage-02-order-transaction.md)<br>契约 `db-stage-02` | ACID/传播/回滚/@Transactional | `mvn test -Dgroups=stage02` 绿 | 🟥 已派发（参考解已实测绿） |
+| 3 | [高并发超卖了！](stage-03-oversell-and-lock.md)<br>契约 `db-stage-03` | 行锁/乐观vs悲观/丢失更新 | `mvn test -Dgroups=stage03` 绿<br>`mvn test -Dgroups=sim -Dtest.excludedGroups=` 零超卖 | 🟥 已派发（参考解已实测绿） |
+| 4 | [对账读到脏数据](stage-04-isolation-and-mvcc.md)<br>契约 `db-stage-04` | 四隔离级别/ReadView/快照读vs当前读 | `mvn test -Dgroups=stage04` 绿 | 🟥 已派发（参考解已实测绿） |
+| 5 | [热点商品打挂 DB](stage-05-cache-triad.md)<br>契约 `db-stage-05` | 穿透/击穿/雪崩/缓存一致性 | `mvn test -Dgroups=stage05` 绿 | 🟥 已派发（参考解已实测绿） |
+| 6 | [死锁与分布式锁（选修）](stage-06-deadlock-and-lock.md)<br>契约 `db-stage-06` | 间隙锁/Next-Key/死锁排查/SET NX PX | `mvn test -Dgroups=stage06` 绿 | 🟥 已派发（参考解已实测绿） |
 
 ## 怎么玩
 

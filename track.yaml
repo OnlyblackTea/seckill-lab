@@ -32,9 +32,13 @@ track:
                                     # ticket.scope.files_to_change 是否真的存在。
     bagu_map: "./docs/数据库八股地图.md"   # 过关后讲解锚点（ticket.submission.bagu_map_ref 指向它）
     stages:                         # 只列**已发布**的 stage（设计 §8 防剧透：未解锁 stage 是
-      - stage-00-onboarding         #   独立 ref，paper enroll 默认不拉）。Stage 2–6 的 🔒 路线
-      - stage-01-product-query-index #  留在 TASKS/README.md 看板里给人看，不进契约。
-                                    # 注：stage-00 是环境入职，**不出 ticket**——理由见 stages/README.md。
+      - stage-00-onboarding         #   独立 ref，paper enroll 默认不拉）。
+      - stage-01-product-query-index
+      - stage-02-order-transaction  # Stage 2–6 现已全部出 ticket：每张的题面/改动面/红绿判据
+      - stage-03-oversell-and-lock  #   都是固定产物，发卷时可复现（§5 第 3 步）。
+      - stage-04-isolation-and-mvcc # 注：stage-00 是环境入职，**不出 ticket**——理由见 stages/README.md。
+      - stage-05-cache-triad
+      - stage-06-deadlock-and-lock
 
   # ── runtime：可执行入口（供应链攻击面）。声明了的每个入口都必须有 digest_pin ──
   runtime:
