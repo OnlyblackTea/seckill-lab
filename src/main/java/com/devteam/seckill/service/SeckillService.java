@@ -54,9 +54,10 @@ public class SeckillService {
         if (product == null || product.getStatus() == null || product.getStatus() != 1) {
             return SeckillResult.soldOut(productId);
         }
-        if (orderMapper.countByUserAndProduct(userId, productId) > 0) {
-            return SeckillResult.duplicate(userId, productId);
-        }
+        // 注意：这里【故意】没有"先查一下这个用户是不是已经下过单"的预检查。
+        // 唯一键 uk_user_product 才是防止重复下单的最终防线；少了预检查，
+        // 同一用户下第二单时 INSERT 会直接撞唯一键失败——而此刻库存已经在上面被扣掉了，
+        // 这正是 Stage 2 要你解决的"库存扣了订单没建"。
 
         // ⚠️ 先读、再判断、最后写回：三步之间没有原子性保证（Stage 3 要改掉它）
         Integer stock = productMapper.selectStock(productId);
