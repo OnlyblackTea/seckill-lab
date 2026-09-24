@@ -1,6 +1,12 @@
 # Stage 1 · 工单：商品搜索查询慢
 
-> 状态：🟥 已派发（验收测试初始为红）· 考点清单见 ticket.yaml 的 `brief.concepts`
+> 状态：✅ 已完成（真机实跑绿）· 证据：[`evidence-stage-01/REPORT.md`](evidence-stage-01/REPORT.md) ·
+> 考点清单见 ticket.yaml 的 `brief.concepts`
+>
+> 最终实测：`mvn -B -Dgroups=stage01 test` → `exit=0` · Tests run: 2, Failures: 0, Errors: 0 ·
+> EXPLAIN 从 `type=ALL / key=NULL / rows=50070 / Using where; Using filesort`
+> 变成 `type=range / key=idx_product_search / rows=1 / Using index condition`。
+> （实现前同一命令为 `exit=1` · Failures: 1, Errors: 1 —— 红在 `searchProducts` 未绑定 + 无索引两处。）
 >
 > **本工单的权威契约**：[`stages/stage-01-product-query-index/ticket.yaml`](../stages/stage-01-product-query-index/ticket.yaml)
 > 版本锚点：工单 id `db-stage-01` · `schema_version=1` · `ticket_version=1` · `test_version=1`

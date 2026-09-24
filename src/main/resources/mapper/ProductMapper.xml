@@ -32,29 +32,23 @@
     </select>
 
     <!-- ============================================================
-         Stage 1（你来实现）：searchProducts
-         ============================================================
-         需求：WHERE category_id = #{categoryId}
-                 AND status      = #{status}
-                 AND price BETWEEN #{minPrice} AND #{maxPrice}
-               ORDER BY price ASC
-               LIMIT #{limit}
-         返回列：至少包含 id,name,category_id,status,price,stock（resultMap=productMap）
+         Stage 1：searchProducts —— 按「分类 + 上架状态 + 价格区间」搜索
 
-         现在这里是【注释掉的占位】，所以接口方法未绑定，调用会抛 BindingException，
-         Stage 1 验收测试因此"初始红"。请把下面的注释去掉并补全 SQL：
-
-         <select id="searchProducts" resultMap="productMap">
-             SELECT <include refid="baseColumns"/>
-             FROM product
-             WHERE ...
-             ORDER BY ...
-             LIMIT #{limit}
-         </select>
-
-         提示：写完 SQL 只是第一步，还要在
-         src/main/resources/db/migration/V1__stage01_product_search_index.sql
-         里加合适的索引，并用 EXPLAIN 证明命中（type=ref/range，而非 ALL）。
+         索引 idx_product_search (category_id, status, price) 的设计：
+           * category_id / status 是等值谓词（=）→ 放最左，先把索引区间收窄；
+           * price 既是范围谓词（BETWEEN）又是 ORDER BY 列 → 放最后。
+             联合索引在等值前缀确定后，后续列天然有序，所以 price 范围扫描
+             出来的顺序就是 price 升序，ORDER BY price ASC 直接复用索引顺序，
+             既不回表排序、也不产生 Using filesort。
          ============================================================ -->
+    <select id="searchProducts" resultMap="productMap">
+        SELECT <include refid="baseColumns"/>
+        FROM product
+        WHERE category_id = #{categoryId}
+          AND status      = #{status}
+          AND price BETWEEN #{minPrice} AND #{maxPrice}
+        ORDER BY price ASC
+        LIMIT #{limit}
+    </select>
 
 </mapper>

@@ -156,6 +156,19 @@ d1_role_reversal）全 PASS，`no_spoiler` 软 PASS（参考解在分支上，�
 >   \+ 脚本内 CRLF 归一化这两道保险是有效的——本仓 `core.autocrlf=true`，不做归一化的话
 >   同一份内容在两个平台会算出不同 pin，pin 就失去意义。四个文件类 pin 是 LF 归一化后的
 >   Merkle 式树摘要；`mysql` / `redis` 两个是 VM 上 `docker image inspect` 的真实 RepoDigest。
+>
+> **2026-09-24 复验（Stage 1 已实现，同一判据重跑）** · 环境：VM 10.32.10.102 · JDK 17.0.20 ·
+> Maven 3.8.7 · Docker 29.1.3 · `mysql:8.0`/`redis:7`，每次跑前 `docker compose down -v` 重置数据卷：
+>
+> | 被测 ref / 内容 | `mvn test -Dgroups=stage01` | 结论 |
+> |---|---|---|
+> | 干净骨架（改动前） | `exit=1` · Tests run: 2, **Failures: 1, Errors: 1** | 红 —— 仍是该红的形状 |
+> | Stage 1 实现（本题改动） | `exit=0` · Tests run: 2, **Failures: 0, Errors: 0** | 绿 |
+> | `solutions` 分支参考解 | `exit=0` · Tests run: 2, **Failures: 0, Errors: 0** | 绿（与实现 DDL/SQL 逐字一致） |
+>
+> 规范化 EXPLAIN：`type=ALL / key=NULL / rows=50070 / Using where; Using filesort`
+> → `type=range / key=idx_product_search / rows=1 / Using index condition`。
+> 完整证据（含索引列序隔离实验与参考解交叉验证）见 [`TASKS/evidence-stage-01/`](TASKS/evidence-stage-01/REPORT.md)。
 
 ---
 

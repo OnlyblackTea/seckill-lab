@@ -1,0 +1,113 @@
+diff --git a/src/main/resources/db/migration/V1__stage01_product_search_index.sql b/src/main/resources/db/migration/V1__stage01_product_search_index.sql
+index 388ad51..22c50bc 100644
+--- a/src/main/resources/db/migration/V1__stage01_product_search_index.sql
++++ b/src/main/resources/db/migration/V1__stage01_product_search_index.sql
+@@ -2,36 +2,25 @@
+ -- Stage 1 工单：为 product 表的"分类 + 上架状态 + 价格区间"搜索加索引。
+ -- 这个文件会被 stage01 验收测试用 @Sql 自动执行（每次跑测试前）。
+ --
+--- 【当前状态】下面全是注释 => 不创建任何索引 => EXPLAIN 走全表扫描(type=ALL) => 测试红。
+--- 【你的任务】把索引建出来，让 EXPLAIN 命中(type=ref/range)，测试变绿。
++-- 索引：idx_product_search (category_id, status, price)
++--   列序理由（最左前缀）：
++--     * category_id、status 是等值谓词 => 放最左，精确定位索引区间（type=ref）；
++--     * price 既是范围谓词（BETWEEN）又是 ORDER BY 列 => 放最后，
++--       索引在等值前缀后按 price 有序，范围扫描天然有序，
++--       ORDER BY price ASC 可直接复用索引顺序（没有 Using filesort）。
++--   为什么不是 (category_id, price, status)：范围列 price 之后的 status 用不上索引，
++--   status 的过滤会退化成回表后再过滤（Using where），区间也更宽。
+ --
+--- 要求：索引名必须叫 idx_product_search（测试按这个名字判断幂等）。
+--- 列的顺序需要你自己决定——想想：
+---   * WHERE 里哪些是等值(=)、哪些是范围(BETWEEN)？
+---   * ORDER BY 用的是哪一列？
+---   * 最左前缀原则下，等值列、范围列、排序列应该怎么排？
+---
+--- 下面是一个"幂等添加索引"的模板（重复执行不会因 Duplicate key name 报错）。
+--- 请把 (col_a, col_b, col_c) 换成你选择的真实列，然后【取消整段注释】：
+---
+--- SET @exist := (SELECT COUNT(1) FROM information_schema.statistics
+---                WHERE table_schema = DATABASE()
+---                  AND table_name   = 'product'
+---                  AND index_name   = 'idx_product_search');
+--- SET @ddl := IF(@exist = 0,
+---                'ALTER TABLE product ADD INDEX idx_product_search (col_a, col_b, col_c)',
+---                'DO 0');
+--- PREPARE stmt FROM @ddl;
+--- EXECUTE stmt;
+--- DEALLOCATE PREPARE stmt;
++-- 幂等：先查 information_schema，不存在才 ADD INDEX，重复执行不报 Duplicate key name。
+ -- =============================================================
+-
+--- 【RED 占位｜实现前请勿删】
+--- 上面整份脚本全是注释。Spring 的 @Sql 在执行前会剥掉注释，剥完发现脚本为空，
+--- 就会抛 IllegalArgumentException: 'script' must not be null or empty，
+--- 导致 stage01 两个用例都"因脚本为空"在 beforeTestMethod 阶段报错——那不是我们要的"红"。
+--- 下面这条无副作用语句让脚本非空即可绕过该断言：它【不创建任何索引】，
+--- 所以 EXPLAIN 仍走全表扫描(type=ALL) => stage01 依然红，且红在对的地方
+--- （searchProducts 未绑定抛 BindingException + EXPLAIN type=ALL/key=NULL）。
+--- 你实现 Stage 1 时：取消上面"幂等加索引"模板的注释、把 (col_a,col_b,col_c) 换成真实列即可；本行可留可删。
+-SELECT 1;
++SET @exist := (SELECT COUNT(1) FROM information_schema.statistics
++               WHERE table_schema = DATABASE()
++                 AND table_name   = 'product'
++                 AND index_name   = 'idx_product_search');
++SET @ddl := IF(@exist = 0,
++               'ALTER TABLE product ADD INDEX idx_product_search (category_id, status, price)',
++               'DO 0');
++PREPARE stmt FROM @ddl;
++EXECUTE stmt;
++DEALLOCATE PREPARE stmt;
++SELECT 1;
+\ No newline at end of file
+diff --git a/src/main/resources/mapper/ProductMapper.xml b/src/main/resources/mapper/ProductMapper.xml
+index b0768c0..62c10ef 100644
+--- a/src/main/resources/mapper/ProductMapper.xml
++++ b/src/main/resources/mapper/ProductMapper.xml
+@@ -32,29 +32,23 @@
+     </select>
+ 
+     <!-- ============================================================
+-         Stage 1（你来实现）：searchProducts
+-         ============================================================
+-         需求：WHERE category_id = #{categoryId}
+-                 AND status      = #{status}
+-                 AND price BETWEEN #{minPrice} AND #{maxPrice}
+-               ORDER BY price ASC
+-               LIMIT #{limit}
+-         返回列：至少包含 id,name,category_id,status,price,stock（resultMap=productMap）
+-
+-         现在这里是【注释掉的占位】，所以接口方法未绑定，调用会抛 BindingException，
+-         Stage 1 验收测试因此"初始红"。请把下面的注释去掉并补全 SQL：
+-
+-         <select id="searchProducts" resultMap="productMap">
+-             SELECT <include refid="baseColumns"/>
+-             FROM product
+-             WHERE ...
+-             ORDER BY ...
+-             LIMIT #{limit}
+-         </select>
+-
+-         提示：写完 SQL 只是第一步，还要在
+-         src/main/resources/db/migration/V1__stage01_product_search_index.sql
+-         里加合适的索引，并用 EXPLAIN 证明命中（type=ref/range，而非 ALL）。
++         Stage 1：searchProducts —— 按「分类 + 上架状态 + 价格区间」搜索
++
++         索引 idx_product_search (category_id, status, price) 的设计：
++           * category_id / status 是等值谓词（=）→ 放最左，先把索引区间收窄；
++           * price 既是范围谓词（BETWEEN）又是 ORDER BY 列 → 放最后。
++             联合索引在等值前缀确定后，后续列天然有序，所以 price 范围扫描
++             出来的顺序就是 price 升序，ORDER BY price ASC 直接复用索引顺序，
++             既不回表排序、也不产生 Using filesort。
+          ============================================================ -->
++    <select id="searchProducts" resultMap="productMap">
++        SELECT <include refid="baseColumns"/>
++        FROM product
++        WHERE category_id = #{categoryId}
++          AND status      = #{status}
++          AND price BETWEEN #{minPrice} AND #{maxPrice}
++        ORDER BY price ASC
++        LIMIT #{limit}
++    </select>
+ 
+ </mapper>

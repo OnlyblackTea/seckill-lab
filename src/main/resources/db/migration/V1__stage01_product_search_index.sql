@@ -2,36 +2,25 @@
 -- Stage 1 工单：为 product 表的"分类 + 上架状态 + 价格区间"搜索加索引。
 -- 这个文件会被 stage01 验收测试用 @Sql 自动执行（每次跑测试前）。
 --
--- 【当前状态】下面全是注释 => 不创建任何索引 => EXPLAIN 走全表扫描(type=ALL) => 测试红。
--- 【你的任务】把索引建出来，让 EXPLAIN 命中(type=ref/range)，测试变绿。
+-- 索引：idx_product_search (category_id, status, price)
+--   列序理由（最左前缀）：
+--     * category_id、status 是等值谓词 => 放最左，精确定位索引区间（type=ref）；
+--     * price 既是范围谓词（BETWEEN）又是 ORDER BY 列 => 放最后，
+--       索引在等值前缀后按 price 有序，范围扫描天然有序，
+--       ORDER BY price ASC 可直接复用索引顺序（没有 Using filesort）。
+--   为什么不是 (category_id, price, status)：范围列 price 之后的 status 用不上索引，
+--   status 的过滤会退化成回表后再过滤（Using where），区间也更宽。
 --
--- 要求：索引名必须叫 idx_product_search（测试按这个名字判断幂等）。
--- 列的顺序需要你自己决定——想想：
---   * WHERE 里哪些是等值(=)、哪些是范围(BETWEEN)？
---   * ORDER BY 用的是哪一列？
---   * 最左前缀原则下，等值列、范围列、排序列应该怎么排？
---
--- 下面是一个"幂等添加索引"的模板（重复执行不会因 Duplicate key name 报错）。
--- 请把 (col_a, col_b, col_c) 换成你选择的真实列，然后【取消整段注释】：
---
--- SET @exist := (SELECT COUNT(1) FROM information_schema.statistics
---                WHERE table_schema = DATABASE()
---                  AND table_name   = 'product'
---                  AND index_name   = 'idx_product_search');
--- SET @ddl := IF(@exist = 0,
---                'ALTER TABLE product ADD INDEX idx_product_search (col_a, col_b, col_c)',
---                'DO 0');
--- PREPARE stmt FROM @ddl;
--- EXECUTE stmt;
--- DEALLOCATE PREPARE stmt;
+-- 幂等：先查 information_schema，不存在才 ADD INDEX，重复执行不报 Duplicate key name。
 -- =============================================================
-
--- 【RED 占位｜实现前请勿删】
--- 上面整份脚本全是注释。Spring 的 @Sql 在执行前会剥掉注释，剥完发现脚本为空，
--- 就会抛 IllegalArgumentException: 'script' must not be null or empty，
--- 导致 stage01 两个用例都"因脚本为空"在 beforeTestMethod 阶段报错——那不是我们要的"红"。
--- 下面这条无副作用语句让脚本非空即可绕过该断言：它【不创建任何索引】，
--- 所以 EXPLAIN 仍走全表扫描(type=ALL) => stage01 依然红，且红在对的地方
--- （searchProducts 未绑定抛 BindingException + EXPLAIN type=ALL/key=NULL）。
--- 你实现 Stage 1 时：取消上面"幂等加索引"模板的注释、把 (col_a,col_b,col_c) 换成真实列即可；本行可留可删。
+SET @exist := (SELECT COUNT(1) FROM information_schema.statistics
+               WHERE table_schema = DATABASE()
+                 AND table_name   = 'product'
+                 AND index_name   = 'idx_product_search');
+SET @ddl := IF(@exist = 0,
+               'ALTER TABLE product ADD INDEX idx_product_search (category_id, status, price)',
+               'DO 0');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 SELECT 1;

@@ -76,11 +76,11 @@ mvn test -Dgroups=stage00
 
 ## 验收标准
 
-- [ ] `docker compose ps` 显示 mysql、redis 均 healthy
-- [ ] `SELECT COUNT(*) FROM product` 返回 50003
-- [ ] `curl localhost:8080/products/1` 返回正确 JSON
-- [ ] `mvn test -Dgroups=stage00` 全绿
-- [ ] 你能口头说清楚「一次 GET /products/1 请求经过哪几层」
+- [x] `docker compose ps` 显示 mysql、redis 均 healthy
+- [x] `SELECT COUNT(*) FROM product` 返回 50003
+- [x] `curl localhost:8080/products/1` 返回正确 JSON
+- [x] `mvn test -Dgroups=stage00` 全绿
+- [x] 你能口头说清楚「一次 GET /products/1 请求经过哪几层」
 
 ## 遇到问题
 

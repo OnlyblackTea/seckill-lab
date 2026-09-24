@@ -15,7 +15,7 @@
 | Stage | 标题 | 八股考点 | 验收 | 状态 |
 |-------|------|---------|------|------|
 | 0 | [入职：拉起环境与骨架](stage-00-onboarding.md) | — | `mvn test -Dgroups=stage00` 绿 | ✅ 已完成（VM 实测绿） |
-| 1 | [商品查询与索引](stage-01-product-query-index.md)<br>契约 `db-stage-01` | 索引/最左前缀/覆盖索引/EXPLAIN/索引失效 | `mvn test -Dgroups=stage01` 绿 | 🟥 已派发 |
+| 1 | [商品查询与索引](stage-01-product-query-index.md)<br>契约 `db-stage-01` | 索引/最左前缀/覆盖索引/EXPLAIN/索引失效 | `mvn test -Dgroups=stage01` 绿 | ✅ 已完成（证据 [`evidence-stage-01/`](evidence-stage-01/REPORT.md)） |
 | 2 | 下单事务 | ACID/传播/回滚/@Transactional | 🔒 待解锁 |
 | 3 | 超卖与锁 | 行锁/乐观vs悲观/丢失更新 | `mvn test -Dgroups=sim` 零超卖 | 🔒 待解锁 |
 | 4 | 隔离级别与 MVCC | 四隔离级别/ReadView/快照读vs当前读 | 🔒 待解锁 |

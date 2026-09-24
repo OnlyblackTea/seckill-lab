@@ -1,0 +1,96 @@
+== 0. tree ready; CRLF normalized ==
+mapper_md5_before=bc38f4a35f75799d19403cba13349566
+migration_md5_before=e659e855ef664f7a12f6f8c7179e3ec5
+canonical_test_md5=2f1ab2cf7c6959b56308eb909afba2b9
+compose_down_exit=0
+compose_up_exit=0
+seed_count=50003 (iteration 1)
+seed_count_final=50003
+== indexes on product BEFORE (pristine) ==
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+product	0	PRIMARY	1	id	A	50070	NULL	NULL		BTREE			YES	NULL
+== row count / tables ==
+mysql: [Warning] Using a password on the command line interface can be insecure.
+rows_in_product
+50003
+Tables_in_seckill_lab
+product
+seckill_order
+user
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	product	NULL	ALL	NULL	NULL	NULL	NULL	50070	0.11	Using where; Using filesort
+red_mvn_exit=1
+== RED maven summary ==
+[ERROR] Tests run: 2, Failures: 1, Errors: 1, Skipped: 0, Time elapsed: 6.689 s <<< FAILURE! -- in com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest
+org.apache.ibatis.binding.BindingException: Invalid bound statement (not found): com.devteam.seckill.mapper.ProductMapper.searchProducts
+[ERROR]   ProductQueryIndexAcceptanceTest.searchReturnsCorrectOrderedResults:87 » Binding Invalid bound statement (not found): com.devteam.seckill.mapper.ProductMapper.searchProducts
+[ERROR] Tests run: 2, Failures: 1, Errors: 1, Skipped: 0
+[INFO] BUILD FAILURE
+== RED surefire cases ==
+Tests run: 2, Failures: 1, Errors: 1, Skipped: 0, Time elapsed: 6.689 s <<< FAILURE! -- in com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest
+com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest.searchReturnsCorrectOrderedResults -- Time elapsed: 2.223 s <<< ERROR!
+com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest.explainUsesIndex -- Time elapsed: 0.875 s <<< FAILURE!
+Invalid bound statement (not found): com.devteam.seckill.mapper.ProductMapper.searchProducts
+EXPLAIN 的 key 为 NULL，说明未命中任何索引（全表扫描） ==> expected: not 
+patched_mapper_md5=8582f3a1e9a71eca487de43e63c1085f
+patched_migration_md5=473ed3de85f7c5f1dfd5da40c46b8173
+green_mvn_exit=0
+== GREEN maven summary ==
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.768 s -- in com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+== GREEN surefire cases ==
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.768 s -- in com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest
+== GREEN in-test EXPLAIN dump ==
+==== Stage1 EXPLAIN ====
+type          = range
+key           = idx_product_search
+possible_keys = idx_product_search
+rows          = 1
+Extra         = Using index condition
+========================
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	product	NULL	range	idx_product_search	idx_product_search	14	NULL	1	100.00	Using index condition
+== indexes on product AFTER ==
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+product	0	PRIMARY	1	id	A	50070	NULL	NULL		BTREE			YES	NULL
+product	1	idx_product_search	1	category_id	A	53	NULL	NULL		BTREE			YES	NULL
+product	1	idx_product_search	2	status	A	51	NULL	NULL		BTREE			YES	NULL
+product	1	idx_product_search	3	price	A	990	NULL	NULL		BTREE			YES	NULL
+== EXPLAIN with (category_id, price, status) ==
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	product	NULL	range	idx_product_search,idx_wrong_order	idx_product_search	14	NULL	1	100.00	Using index condition
+== EXPLAIN with (price, category_id, status) ==
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	product	NULL	range	idx_product_search,idx_price_first	idx_product_search	14	NULL	1	100.00	Using index condition
+mysql: [Warning] Using a password on the command line interface can be insecure.
+matching_rows
+0
+== EXPLAIN with WHERE terms reordered (same index) ==
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	product	NULL	range	idx_product_search	idx_product_search	14	NULL	1	100.00	Using index condition
+scratch clone failed; reference cross-check skipped
+fatal: repository '/home/lqz/seckill-verify/seckill-lab' does not exist
+artifacts_listing:
+total 64
+-rw-rw-r-- 1 lqz lqz  765 Sep 24 19:16 CHECKSUMS.txt
+-rw-rw-r-- 1 lqz lqz  485 Sep 24 19:14 compose-down.txt
+-rw-rw-r-- 1 lqz lqz 1076 Sep 24 19:15 compose-up.txt
+-rw-rw-r-- 1 lqz lqz  273 Sep 24 19:16 explain-after.txt
+-rw-rw-r-- 1 lqz lqz  253 Sep 24 19:15 explain-before.txt
+-rw-rw-r-- 1 lqz lqz  289 Sep 24 19:16 explain-price-first.txt
+-rw-rw-r-- 1 lqz lqz  273 Sep 24 19:16 explain-where-reordered.txt
+-rw-rw-r-- 1 lqz lqz  289 Sep 24 19:16 explain-wrong-order.txt
+-rw-rw-r-- 1 lqz lqz 6066 Sep 24 19:16 mvn-green.log
+-rw-rw-r-- 1 lqz lqz 8582 Sep 24 19:15 mvn-red.log
+-rw-rw-r-- 1 lqz lqz   72 Sep 24 19:16 refclone.err
+drwxrwxr-x 2 lqz lqz 4096 Sep 24 19:16 surefire-green
+drwxrwxr-x 2 lqz lqz 4096 Sep 24 19:15 surefire-red
+=== END ===

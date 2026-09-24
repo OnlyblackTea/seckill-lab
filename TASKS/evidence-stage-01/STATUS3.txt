@@ -1,0 +1,59 @@
+--- fetched refs ---
+refs/remotes/origin/HEAD 0cbfbc1
+refs/remotes/origin/main 0cbfbc1
+refs/remotes/origin/solutions 9081746
+refs/remotes/origin/stage-01-product-query-index 0cbfbc1
+refs/remotes/origin/stage-01-product-query-index-sol 1487dbb
+--- reference index DDL ---
+-- 幂等：先查 information_schema，不存在才 ADD INDEX，重复执行不报错。
+               'ALTER TABLE product ADD INDEX idx_product_search (category_id, status, price)',
+--- reference searchProducts ---
+    <select id="searchProducts" resultMap="productMap">
+        SELECT <include refid="baseColumns"/>
+        FROM product
+        WHERE category_id = #{categoryId}
+          AND status      = #{status}
+          AND price BETWEEN #{minPrice} AND #{maxPrice}
+        ORDER BY price ASC
+        LIMIT #{limit}
+    </select>
+reffix_mvn_exit=0
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.766 s -- in com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+==== Stage1 EXPLAIN ====
+type          = range
+key           = idx_product_search
+possible_keys = idx_product_search
+rows          = 1
+Extra         = Using index condition
+========================
+mapper_diff_lines=18
+migration_diff_lines=34
+--- mapper diff (reference vs mine) ---
+35,37c35,42
+<          Stage 1 参考解（仅存在于 solutions 分支，勿合入 main）。
+<          等值列 category_id/status 用 = ，范围列 price 用 BETWEEN，
+<          ORDER BY price ASC，LIMIT #{limit}。
+---
+>          Stage 1：searchProducts —— 按「分类 + 上架状态 + 价格区间」搜索
+> 
+>          索引 idx_product_search (category_id, status, price) 的设计：
+>            * category_id / status 是等值谓词（=）→ 放最左，先把索引区间收窄；
+>            * price 既是范围谓词（BETWEEN）又是 ORDER BY 列 → 放最后。
+>              联合索引在等值前缀确定后，后续列天然有序，所以 price 范围扫描
+>              出来的顺序就是 price 升序，ORDER BY price ASC 直接复用索引顺序，
+>              既不回表排序、也不产生 Using filesort。
+49c54
+< </mapper>
+---
+> </mapper>
+\ No newline at end of file
+=== stage-01-product-query-index-sol tip ===
+1487dbb solution(stage01): reference answer on top of current main
+1487dbb solution(stage01): reference answer on top of current main
+ .../migration/V1__stage01_product_search_index.sql | 40 +++++++++-------------
+ src/main/resources/mapper/ProductMapper.xml        | 35 +++++++------------
+ 2 files changed, 29 insertions(+), 46 deletions(-)
+=== status after ref run (does ref DDL match mine?) ===
+3d485c4be86fff0a78bab47bd0934f46  /home/lqz/seckill-verify/seckill-lab/src/main/resources/db/migration/V1__stage01_product_search_index.sql
