@@ -1,35 +1,53 @@
-re-extracted and CRLF-normalized
-compose_up_exit=0
-seed_count=50008
-PONG
-compile_exit=0
-[INFO] BUILD SUCCESS
-stage00: exit=0 | [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
-stage01: exit=0 | [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
-stage02: exit=0 | [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
-stage03: exit=0 | [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
-stage04: exit=0 | [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
-stage05: exit=0 | [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
-stage06: exit=0 | [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0 | [INFO] BUILD SUCCESS
-sim: exit=0
-成功下单 (200)    = 10
-售罄 (410)        = 90
-最终库存          = 0
-落库订单数        = 10
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.433 s -- in com.devteam.seckill.sim.SeckillLoadSimulator
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
-[INFO] BUILD SUCCESS
-== stage00 ==
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.545 s -- in com.devteam.seckill.SmokeTest
-== stage01 ==
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.398 s -- in com.devteam.seckill.stage01.ProductQueryIndexAcceptanceTest
-== stage02 ==
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.560 s -- in com.devteam.seckill.stage02.SeckillTransactionAcceptanceTest
-== stage03 ==
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.450 s -- in com.devteam.seckill.stage03.OversellPreventionAcceptanceTest
-== stage04 ==
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.550 s -- in com.devteam.seckill.stage04.IsolationLevelAcceptanceTest
-== stage05 ==
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.843 s -- in com.devteam.seckill.stage05.ProductCacheAcceptanceTest
-== stage06 ==
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.091 s -- in com.devteam.seckill.stage06.DistributedLockAcceptanceTest
+# Stage 2–6 一次性全组验证 · 机读汇总
+
+> 环境：VM 10.32.10.102 · JDK 17.0.20 · Maven 3.8.7 · Docker 29.1.3 · mysql:8.0 / redis:7
+> 命令（每轮先 `docker compose down -v` 重置数据卷与种子）：
+>   mvn -B -Dgroups=stage00,stage01,stage02,stage03,stage04,stage05,stage06,sim -Dtest.excludedGroups= test
+> 原始日志：mvn-all-skeleton.log / mvn-all-solutions.log（本目录）
+
+## main（骨架）—— 红
+
+```
+tests_run_total = 26
+failures        = 6
+errors          = 14
+build           = FAILURE
+
+stage00 SmokeTest                          run=3 failures=0 errors=0   PASS
+stage01 ProductQueryIndexAcceptanceTest    run=2 failures=1 errors=1   FAIL(索引未建/语句未绑定)
+stage02 SeckillTransactionAcceptanceTest   run=3 failures=1 errors=0   FAIL(回滚：库存没退)
+stage03 OversellPreventionAcceptanceTest   run=1 failures=1 errors=0   FAIL(超卖 30 > 10)
+stage04 IsolationLevelAcceptanceTest       run=6 failures=0 errors=6   FAIL(order_stat 不存在/聚合未绑定)
+stage05 ProductCacheAcceptanceTest         run=6 failures=1 errors=4   FAIL(getProductCached 未实现)
+stage06 DistributedLockAcceptanceTest      run=4 failures=1 errors=3   FAIL(tryLock 未实现)
+sim    SeckillLoadSimulator                run=1 failures=1 errors=0   FAIL(零超卖判据不成立)
+```
+
+关键判据原文：
+- stage03: `成功下单数必须恰好等于初始库存：多了=超卖，少了=把正常请求也拒了 ==> expected: <10> but was: <30>`
+- stage02: `rollback_onOrderInsertFailure_restoresStock` 断言失败（重复下单失败后库存未回到原值）
+- stage03 实测四元组：成功下单=30 / 售罄=0 / 最终库存=7 / 落库订单数=30
+
+## solutions（参考解）—— 绿
+
+```
+tests_run_total = 26
+failures        = 0
+errors          = 0
+build           = SUCCESS
+
+stage00 SmokeTest                          run=3 failures=0 errors=0   PASS
+stage01 ProductQueryIndexAcceptanceTest    run=2 failures=0 errors=0   PASS
+stage02 SeckillTransactionAcceptanceTest   run=3 failures=0 errors=0   PASS
+stage03 OversellPreventionAcceptanceTest   run=1 failures=0 errors=0   PASS
+stage04 IsolationLevelAcceptanceTest       run=6 failures=0 errors=0   PASS
+stage05 ProductCacheAcceptanceTest         run=6 failures=0 errors=0   PASS
+stage06 DistributedLockAcceptanceTest      run=4 failures=0 errors=0   PASS
+sim    SeckillLoadSimulator                run=1 failures=0 errors=0   PASS
+```
+
+关键实测数字：
+- stage03（30 线程 / 库存 10）：成功=10 / 售罄=20 / 最终库存=0 / 订单=10
+- sim（100 线程 HTTP）：成功=10 / 售罄=90 / 重复=0 / 未实现=0 / 最终库存=0 / 订单=10 → 零超卖
+- stage05 防击穿（20 并发查同一个不存在的 id）：DB 加载次数 = 1
+- stage06 按序加锁：8 线程反向加锁顺序，全部成功、无死锁

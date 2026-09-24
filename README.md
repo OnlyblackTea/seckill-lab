@@ -56,6 +56,19 @@ mvn test -Dgroups=stage00
 | 5 | 热点商品打挂 DB | Redis 穿透/击穿/雪崩/一致性 | 🟥 已派发（契约 `db-stage-05`） |
 | 6 | 死锁与分布式锁（选修） | 间隙锁/Next-Key/死锁排查/SET NX PX | 🟥 已派发（契约 `db-stage-06`） |
 
+> **全阶段真机实测（2026-09-24 · VM 10.32.10.102 · JDK17 + mysql:8.0/redis:7）**
+>
+> | ref | `mvn -Dgroups=stage00…stage06,sim test` |
+> |---|---|
+> | `solutions`（参考解） | `exit=0` · Tests run: **26, Failures: 0, Errors: 0** |
+> | `main`（骨架） | `exit=1` · Tests run: **26, Failures: 6, Errors: 14** |
+>
+> 骨架各阶段红在**各自的缺陷**上：stage02 红在"重复下单失败后库存没回滚"、
+> stage03 实测超卖（`expected: <10> but was: <30>`）、stage04 红在 `order_stat` 缺失、
+> stage05 红在缓存未实现、stage06 红在锁未实现。
+> 参考解侧：stage03 恰好卖 10 / 库存 0、sim 100 线程零超卖、stage05 防击穿 DB 加载 20→1。
+> 证据与原始日志：[`TASKS/evidence-stages-02-06/REPORT.md`](TASKS/evidence-stages-02-06/REPORT.md)。
+
 > 每个 stage 的题面、改动白名单、红绿判据、hints 都只存一份，在 `stages/<stage>/ticket.yaml`；
 > `TASKS/*.md` 是给人读的叙述视图。参考解只存在于 `solutions` 分支，**绝不进 `main`**。
 
