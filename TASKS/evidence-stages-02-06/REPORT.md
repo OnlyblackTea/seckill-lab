@@ -12,9 +12,12 @@
 
 ## 一、判别性：同一套测试在两个 ref 上结果相反
 
+> 最终状态的一轮：`main` 上 Stage 1 是**已交付**阶段（`searchProducts` 已绑定 + V1 已建索引），
+> 所以它跑绿；红的是 Stage 2–6。`solutions` 上全绿。
+
 | ref | `mvn -Dgroups=stage00…stage06,sim test` | 结论 |
 |---|---|---|
-| `main`（骨架） | `exit=1` · Tests run: **26, Failures: 6, Errors: 14** | 红（各阶段红在各自的缺陷上，见下表） |
+| `main`（骨架，Stage 1 已交付） | `exit=1` · Tests run: **26, Failures: 6, Errors: 14** | stage00/01 绿；stage02–06 红在各自缺陷上 |
 | `solutions`（参考解） | `exit=0` · Tests run: **26, Failures: 0, Errors: 0** · BUILD SUCCESS | 绿 |
 
 参考解逐类结果（一次运行内）：
