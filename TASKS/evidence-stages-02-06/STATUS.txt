@@ -1,11 +1,11 @@
-# Stage 2–6 一次性全组验证 · 机读汇总
+# Stage 2–6 一次性全组验证 · 机读汇总（最终状态）
 
 > 环境：VM 10.32.10.102 · JDK 17.0.20 · Maven 3.8.7 · Docker 29.1.3 · mysql:8.0 / redis:7
 > 命令（每轮先 `docker compose down -v` 重置数据卷与种子）：
 >   mvn -B -Dgroups=stage00,stage01,stage02,stage03,stage04,stage05,stage06,sim -Dtest.excludedGroups= test
-> 原始日志：mvn-all-skeleton.log / mvn-all-solutions.log（本目录）
+> 原始日志：mvn-all-skeleton.log / mvn-all-solutions.log（本目录，最后一轮实跑）
 
-## main（骨架）—— 红
+## main（骨架）—— stage 0/1 绿，stage 2–6 红在各自缺陷上
 
 ```
 tests_run_total = 26
@@ -14,21 +14,29 @@ errors          = 14
 build           = FAILURE
 
 stage00 SmokeTest                          run=3 failures=0 errors=0   PASS
-stage01 ProductQueryIndexAcceptanceTest    run=2 failures=1 errors=1   FAIL(索引未建/语句未绑定)
-stage02 SeckillTransactionAcceptanceTest   run=3 failures=1 errors=0   FAIL(回滚：库存没退)
-stage03 OversellPreventionAcceptanceTest   run=1 failures=1 errors=0   FAIL(超卖 30 > 10)
-stage04 IsolationLevelAcceptanceTest       run=6 failures=0 errors=6   FAIL(order_stat 不存在/聚合未绑定)
-stage05 ProductCacheAcceptanceTest         run=6 failures=1 errors=4   FAIL(getProductCached 未实现)
-stage06 DistributedLockAcceptanceTest      run=4 failures=1 errors=3   FAIL(tryLock 未实现)
-sim    SeckillLoadSimulator                run=1 failures=1 errors=0   FAIL(零超卖判据不成立)
+stage01 ProductQueryIndexAcceptanceTest    run=2 failures=0 errors=0   PASS   (Stage 1 已交付)
+stage02 SeckillTransactionAcceptanceTest   run=3 failures=1 errors=0   FAIL   回滚：库存没退
+stage03 OversellPreventionAcceptanceTest   run=1 failures=1 errors=0   FAIL   超卖 30 > 10
+stage04 IsolationLevelAcceptanceTest       run=6 failures=0 errors=6   FAIL   order_stat 不存在
+stage05 ProductCacheAcceptanceTest         run=6 failures=1 errors=4   FAIL   缓存未实现
+stage06 DistributedLockAcceptanceTest      run=4 failures=1 errors=3   FAIL   锁未实现
+sim    SeckillLoadSimulator                run=1 failures=1 errors=0   FAIL   零超卖判据不成立
 ```
 
 关键判据原文：
-- stage03: `成功下单数必须恰好等于初始库存：多了=超卖，少了=把正常请求也拒了 ==> expected: <10> but was: <30>`
-- stage02: `rollback_onOrderInsertFailure_restoresStock` 断言失败（重复下单失败后库存未回到原值）
-- stage03 实测四元组：成功下单=30 / 售罄=0 / 最终库存=7 / 落库订单数=30
 
-## solutions（参考解）—— 绿
+```
+stage03: 成功下单数必须恰好等于初始库存：多了=超卖，少了=把正常请求也拒了 ==> expected: <10> but was: <30>
+stage02: rollback_onOrderInsertFailure_restoresStock 断言失败（重复下单失败后库存未回到原值）
+stage04: order_stat 表不存在：请把 V2 迁移脚本里的建表语句补出来
+stage05: UnsupportedOperationException: 商品缓存尚未实现（Stage 5）…
+stage06: UnsupportedOperationException: 分布式锁尚未实现（Stage 6）…
+```
+
+stage03 实测四元组（骨架）：成功下单=30 / 售罄=0 / 最终库存=7 / 落库订单数=30
+—— 卖出 30 件而库存只掉 3 件，27 件的扣减被丢失更新吃掉。
+
+## solutions（参考解）—— 全绿
 
 ```
 tests_run_total = 26
@@ -47,7 +55,8 @@ sim    SeckillLoadSimulator                run=1 failures=0 errors=0   PASS
 ```
 
 关键实测数字：
+
 - stage03（30 线程 / 库存 10）：成功=10 / 售罄=20 / 最终库存=0 / 订单=10
 - sim（100 线程 HTTP）：成功=10 / 售罄=90 / 重复=0 / 未实现=0 / 最终库存=0 / 订单=10 → 零超卖
 - stage05 防击穿（20 并发查同一个不存在的 id）：DB 加载次数 = 1
-- stage06 按序加锁：8 线程反向加锁顺序，全部成功、无死锁
+- stage06 按序加锁：8 线程以相反顺序对同两个商品加锁下单，全部成功、无死锁
