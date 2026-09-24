@@ -11,6 +11,29 @@ stages/
 发卷平台按 `stages/*/ticket.yaml` 发现工单（`platform_service/admission.py` 就是这么 glob 的），
 所以**目录名必须与 `track.yaml` 的 `manifest.stages` 条目一致**。
 
+## 分支结构（发卷平台真正依赖的东西）
+
+目录名不只是归档习惯——**它就是 git 分支名**。平台的 Forge 在 provision 时会：
+
+1. `base_ref = origin/<目录名>`：该阶段的**起始代码**（学员拿到的骨架）；
+2. `head_ref = origin/<目录名>-sol`：该阶段的**参考解 ref**（桩 Forge 用它当"学员已改对"的另一端，
+   好让 diff 有两端可比）。
+
+两个 ref 缺一个都会在 `POST /instances/{id}/provision` 阶段报 `workspace_ref_missing`
+（`platform_service/forge.py::must_have_ref`），错误信息里会列出仓库现有的 ref。
+
+因此每个**已评估**的 stage 都对应两条分支：
+
+| 分支 | 内容 | 在它上面跑 |
+|---|---|---|
+| `stage-NN-<name>` | 骨架 + **截至本阶段**的验收测试（不含后续阶段的测试，否则等于剧透判据） | 应当**红**（学员还没动手） |
+| `stage-NN-<name>-sol` | 上面那份 + **截至本阶段**的参考实现（后续阶段仍是骨架） | 应当**绿** |
+
+`main` 是完整骨架（含全部阶段测试）用于整体体检；`solutions` 是**全阶段**参考解，
+**只作总参考**，不作为任何 stage 的 base/head——一次 clone 就把全部答案给出去不符合 §8 的防剧透模型。
+
+`stage-00-onboarding` 不出 ticket，因此**不需要分支**（它只上 `manifest.stages` 看板）。
+
 ## ticket.yaml 与 TASKS/*.md 的关系
 
 | | 是什么 | 给谁看 |
