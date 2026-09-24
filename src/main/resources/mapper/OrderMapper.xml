@@ -13,26 +13,21 @@
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
-    <!-- ============================================================
-         Stage 2（你来实现）：
-           * insertOrder —— 插入订单
-             要点：useGeneratedKeys + keyProperty="id"，把自增主键回填到入参对象上
-             （否则 service 拿不到订单 id，验收测试第一条也断不出来）。
-           * countByProduct —— 统计某商品已创建订单数
-         现在这里是【注释掉的占位】，所以两个方法都未绑定，调用会抛
-         BindingException: Invalid bound statement (not found) —— 这正是
-         Stage 2 验收测试"初始红"的原因。请把下面的注释去掉并补全 SQL：
+    <!-- 插入订单（骨架里已实现并绑定，作为你写 XML 的**参照样式**：
+         useGeneratedKeys + keyProperty="id" 把自增主键回填到入参对象上，
+         否则 service 拿不到订单 id）。
+         注意：Stage 2 的红**不在**这条语句上——它在 SeckillService 的事务边界上。 -->
+    <insert id="insertOrder" parameterType="com.devteam.seckill.domain.SeckillOrder"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO seckill_order (user_id, product_id, quantity, amount, status)
+        VALUES (#{userId}, #{productId}, #{quantity}, #{amount}, #{status})
+    </insert>
 
-         <insert id="insertOrder" parameterType="com.devteam.seckill.domain.SeckillOrder"
-                 useGeneratedKeys="true" keyProperty="id">
-             INSERT INTO seckill_order (user_id, product_id, quantity, amount, status)
-             VALUES (#{userId}, #{productId}, #{quantity}, #{amount}, #{status})
-         </insert>
-
-         <select id="countByProduct" resultType="int">
-             SELECT COUNT(*) FROM seckill_order WHERE product_id = #{productId}
-         </select>
-         ============================================================ -->
+    <!-- 按商品统计订单数：骨架里已经实现并绑定（Stage 2 的回滚判据、Stage 3 的超卖判据都要用它；
+         注意它【不能】被删——删了就会让 Stage 2/3 红在"语句未绑定"而不是红在业务缺陷上） -->
+    <select id="countByProduct" resultType="int">
+        SELECT COUNT(*) FROM seckill_order WHERE product_id = #{productId}
+    </select>
 
     <!-- 按"用户 + 商品"统计：唯一键 uk_user_product 的业务侧预检查（防止重复下单白跑一次扣库存） -->
     <select id="countByUserAndProduct" resultType="int">

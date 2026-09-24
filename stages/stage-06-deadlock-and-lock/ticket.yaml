@@ -42,10 +42,10 @@ brief:
 
     这不是编的——本骨架的 SeckillService 把「扣库存（写 product）」与「建订单（写 seckill_order）」
     拆成两行、两步，中间没有任何「谁先谁后」的约定，两个并发事务以相反顺序碰这两行就构成循环等待；
-    而 LockService 的三个方法现在全是 TODO，多实例部署时本地锁根本锁不住。
+    而 LockService 接口的三个方法在 LockServiceImpl 里现在全是 TODO（抛 UnsupportedOperationException），多实例部署时本地锁根本锁不住。
 
     【你要做什么｜正好改两个文件（就是 scope.files_to_change 那两个）】
-    1) src/main/java/com/devteam/seckill/service/LockService.java
+    1) src/main/java/com/devteam/seckill/service/LockServiceImpl.java
        接口已定稿（骨架不改签名，**你只改实现**），三个方法：
          boolean tryLock(String key, String token, long ttlMillis);  // 非阻塞抢锁
          void    unlock(String key, String token);                   // 释放锁
@@ -109,7 +109,7 @@ grader:
     canonical_test: src/test/java/com/devteam/seckill/stage06/DistributedLockAcceptanceTest.java
     expect: |-
       初始为【红】，且必须红在该原因上（canonical 测试尚未放出，以下为**预期**形状）：
-        - LockService.tryLock / unlock / isHeldBy 全是 TODO，调用抛
+        - LockServiceImpl.tryLock / unlock / isHeldBy 全是 TODO，调用抛
           UnsupportedOperationException("...")；用例 ①~④ 在第一个断言前就炸在这里。
       改对后为【绿】（5 个用例）：
         ① 互斥：同 key 第二次 tryLock 返回 false；
@@ -192,7 +192,7 @@ hints:
 submission:
   template:
     require:
-      - 改后的 LockService 关键实现（抢锁那一条命令 + 释放锁的 Lua 脚本）+ SeckillService 里的加锁顺序
+      - 改后的 LockServiceImpl（或你新建的实现类）关键实现（抢锁那一条命令 + 释放锁的 Lua 脚本）+ SeckillService 里的加锁顺序
       - 一句话解释你的锁如何防「误删」、如何防「持锁进程挂了导致死锁」
       - 实测证据：并发抢锁结果、TTL 到期释放、误删防护的前后对比
   # 锚点算法（admission._github_anchor，手写必错）：标题 strip → lower → **只保留 isalnum 或 " -_"**
