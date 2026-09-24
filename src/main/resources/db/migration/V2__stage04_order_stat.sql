@@ -1,39 +1,20 @@
 -- =============================================================
--- Stage 4 工单：对账表 order_stat 的建表脚本。
--- 这个文件会被 stage04 验收测试用 @Sql 自动执行（每个测试方法前一次）。
--- 文件名里的 V2 表示它是第二条迁移（V1 是 Stage 1 的索引）。
+-- Stage 4 参考解：对账表 order_stat（幂等建表）。
+-- （参考解仅存在于 solutions 分支，勿合入 main）
 --
--- 【当前状态】下面全是注释 => 不创建任何表 => 对账相关的验收用例会因为
--- "表 order_stat 不存在"（或后续汇总 SQL 未绑定）而失败 => 测试红。
--- 【你的任务】把建表语句补出来，让验收测试变绿。
---
--- 要求：
---   1) 必须【幂等】：这个脚本每次测试方法前都会执行，重复跑不能报
---      "Table 'order_stat' already exists"。用 CREATE TABLE IF NOT EXISTS。
---   2) 表结构必须与下面注释里的定义**逐字一致**（验收测试按列名/唯一键断言）：
---
---      CREATE TABLE IF NOT EXISTS order_stat (
---        id          BIGINT        NOT NULL AUTO_INCREMENT,
---        product_id  BIGINT        NOT NULL,
---        order_count INT           NOT NULL DEFAULT 0,
---        amount_sum  DECIMAL(12,2) NOT NULL DEFAULT 0,
---        updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
---                                  ON UPDATE CURRENT_TIMESTAMP,
---        PRIMARY KEY (id),
---        UNIQUE KEY uk_product (product_id)
---      ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
---
---      为什么 product_id 要唯一键：对账口径是"每个商品一行"，
---      upsert（INSERT ... ON DUPLICATE KEY UPDATE）正是靠它判断"该累加还是该插入"。
---   3) 引擎必须是 InnoDB：只有 InnoDB 才有行锁 / MVCC / 间隙锁，
---      本阶段要观察的"未提交不可见""快照读 vs 当前读"在 MyISAM 上根本不存在。
+-- 为什么必须有这张表：对账/统计需要一个"口径落点"。两条聚合 SQL 算出来的
+-- order_count / amount_sum 要能持续累加，就靠 uk_product 唯一键 + upsert 实现。
+-- 引擎必须是 InnoDB：只有它才有行锁 / MVCC / 间隙锁，本阶段要观察的
+-- "未提交不可见""快照读 vs 当前读"在 MyISAM 上根本不存在。
 -- =============================================================
+CREATE TABLE IF NOT EXISTS order_stat (
+  id          BIGINT        NOT NULL AUTO_INCREMENT,
+  product_id  BIGINT        NOT NULL,
+  order_count INT           NOT NULL DEFAULT 0,
+  amount_sum  DECIMAL(12,2) NOT NULL DEFAULT 0,
+  updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_product (product_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
--- 【RED 占位｜实现前请勿删】
--- 上面整份脚本全是注释。Spring 的 @Sql 在执行前会剥掉注释，剥完发现脚本为空，
--- 就会抛 IllegalArgumentException: 'script' must not be null or empty，
--- 导致 stage04 用例都"因脚本为空"在 beforeTestMethod 阶段报错——那不是我们要的"红"。
--- 下面这条无副作用语句让脚本非空即可绕过该断言：它【不创建任何表】，
--- 所以对账用例仍会失败在"表不存在"上 => stage04 依然红，且红在对的地方。
--- 你实现 Stage 4 时：把上面的建表语句补出来即可；本行可留可删。
 SELECT 1;

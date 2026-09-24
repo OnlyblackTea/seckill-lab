@@ -13,27 +13,44 @@
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
-    <!-- 插入订单（骨架里已实现并绑定，作为你写 XML 的**参照样式**：
-         useGeneratedKeys + keyProperty="id" 把自增主键回填到入参对象上，
-         否则 service 拿不到订单 id）。
-         注意：Stage 2 的红**不在**这条语句上——它在 SeckillService 的事务边界上。 -->
+    <!-- ============================================================
+         Stage 2 参考解：insertOrder
+         useGeneratedKeys + keyProperty 把自增主键回填到入参对象上，
+         否则 service 拿不到订单 id，验收用例第一条就断不出来。
+         ============================================================ -->
     <insert id="insertOrder" parameterType="com.devteam.seckill.domain.SeckillOrder"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO seckill_order (user_id, product_id, quantity, amount, status)
         VALUES (#{userId}, #{productId}, #{quantity}, #{amount}, #{status})
     </insert>
 
-    <!-- 按商品统计订单数：骨架里已经实现并绑定（Stage 2 的回滚判据、Stage 3 的超卖判据都要用它；
-         注意它【不能】被删——删了就会让 Stage 2/3 红在"语句未绑定"而不是红在业务缺陷上） -->
+    <!-- Stage 2/3 参考解：按商品统计订单数（校验是否超卖 / 对账） -->
     <select id="countByProduct" resultType="int">
         SELECT COUNT(*) FROM seckill_order WHERE product_id = #{productId}
     </select>
 
-    <!-- 按"用户 + 商品"统计：唯一键 uk_user_product 的业务侧预检查（防止重复下单白跑一次扣库存） -->
+    <!-- 按"用户 + 商品"统计：唯一键 uk_user_product 的业务侧预检查 -->
     <select id="countByUserAndProduct" resultType="int">
         SELECT COUNT(*) FROM seckill_order
         WHERE user_id = #{userId} AND product_id = #{productId}
     </select>
+
+    <!-- ============================================================
+         Stage 4 参考解：对账口径的两条 SQL
+         IFNULL 兜底：没有订单时返回 0 而不是 null，调用方不用到处判空。
+         ============================================================ -->
+    <select id="sumAmountByProduct" resultType="java.math.BigDecimal">
+        SELECT IFNULL(SUM(amount), 0) FROM seckill_order WHERE product_id = #{productId}
+    </select>
+
+    <!-- 幂等写入对账表：靠 uk_product 唯一键判断"累加"还是"插入" -->
+    <insert id="upsertOrderStat">
+        INSERT INTO order_stat (product_id, order_count, amount_sum)
+        VALUES (#{productId}, #{orderCount}, #{amountSum})
+        ON DUPLICATE KEY UPDATE
+          order_count = #{orderCount},
+          amount_sum  = #{amountSum}
+    </insert>
 
     <!-- 按主键查订单（测试与排查用） -->
     <select id="findById" resultMap="orderMap">
@@ -41,26 +58,5 @@
         FROM seckill_order
         WHERE id = #{id}
     </select>
-
-    <!-- ============================================================
-         Stage 4（你来实现）：对账口径的两条聚合 SQL
-           * sumAmountByProduct —— 按商品汇总成交额；没有订单时要用 IFNULL/COALESCE
-             返回 0 而不是 null（否则调用方要到处判空）。
-           * upsertOrderStat —— 把对账结果幂等写进 order_stat：
-             INSERT ... ON DUPLICATE KEY UPDATE，靠 uk_product 唯一键兜底。
-         现在这里是【注释掉的占位】，未绑定 → 调用抛 BindingException：
-
-         <select id="sumAmountByProduct" resultType="java.math.BigDecimal">
-             SELECT IFNULL(SUM(amount), 0) FROM seckill_order WHERE product_id = #{productId}
-         </select>
-
-         <insert id="upsertOrderStat">
-             INSERT INTO order_stat (product_id, order_count, amount_sum)
-             VALUES (#{productId}, #{orderCount}, #{amountSum})
-             ON DUPLICATE KEY UPDATE
-               order_count = VALUES(order_count),
-               amount_sum  = VALUES(amount_sum)
-         </insert>
-         ============================================================ -->
 
 </mapper>

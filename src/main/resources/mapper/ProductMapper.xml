@@ -18,21 +18,21 @@
         id, name, category_id, status, price, stock, version, created_at
     </sql>
 
-    <!-- Stage 0：主键查询（已实现） -->
+    <!-- Stage 0：主键查询 -->
     <select id="selectById" resultMap="productMap">
         SELECT <include refid="baseColumns"/>
         FROM product
         WHERE id = #{id}
     </select>
 
-    <!-- 按主键查询（与 selectById 同义，供业务层按语义选用） -->
+    <!-- 按主键查询（与 selectById 同义） -->
     <select id="findById" resultMap="productMap">
         SELECT <include refid="baseColumns"/>
         FROM product
         WHERE id = #{id}
     </select>
 
-    <!-- Stage 0：全表查询（已实现）。大表下这是全表扫描，Stage 1 用它对比优化前后。 -->
+    <!-- Stage 0：全表查询（大表下全表扫描，Stage 1 用它对比优化前后） -->
     <select id="selectAll" resultMap="productMap">
         SELECT <include refid="baseColumns"/>
         FROM product
@@ -44,11 +44,12 @@
     </select>
 
     <!-- ============================================================
-         Stage 1（已实现）：searchProducts
-         配套索引 idx_product_search (category_id, status, price) 由
-         db/migration/V1__stage01_product_search_index.sql 幂等创建。
-         列序理由：等值列 category_id/status 在前收窄区间，范围+排序列 price 在后，
-         索引顺序天然满足 ORDER BY price ASC（无 Using filesort）。
+         Stage 1 参考解：searchProducts
+         联合索引 idx_product_search (category_id, status, price) 的设计：
+           * category_id / status 是等值谓词（=）→ 放最左，先把索引区间收窄；
+           * price 既是范围谓词（BETWEEN）又是 ORDER BY 列 → 放最后。
+             联合索引在等值前缀确定后，后续列天然有序，所以 price 范围扫描
+             出来的顺序就是 price 升序，ORDER BY 直接复用索引顺序，无 filesort。
          ============================================================ -->
     <select id="searchProducts" resultMap="productMap">
         SELECT <include refid="baseColumns"/>
@@ -61,42 +62,34 @@
     </select>
 
     <!-- ============================================================
-         Stage 2/3（你来实现）：decrementStock —— 原子扣减一件库存
-         ============================================================
-         为什么"判断够不够"和"扣减"必须写成同一条 UPDATE：
-           UPDATE 会对该行加排他锁，并基于【最新已提交版本】重新求值 WHERE（当前读），
-           所以并发请求被行锁串行化，"读-判断-写"之间不再有窗口 —— 这是不超卖的根因。
-         反面写法（骨架里原样保留在 service 层给你对照）：
-           先 selectStock 拿到 10 → 应用里判断 > 0 → 再 UPDATE ... SET stock = 10 - 1，
-           两个并发线程可能都读到 10，各扣一次 → 丢失更新 → 超卖。
-
-         请把下面的占位补全（返回受影响行数：1=扣减成功，0=库存不足）：
-
-         <update id="decrementStock">
-             UPDATE product
-             SET stock = stock - 1
-             WHERE id = #{id}
-               AND stock > 0
-         </update>
+         Stage 2/3 参考解：decrementStock —— 原子扣减一件库存
+         判断（stock > 0）与扣减（stock = stock - 1）在同一条 UPDATE 里：
+         InnoDB 对该行加 X 锁，并在最新已提交版本上重新求值 WHERE（当前读），
+         并发请求因此被行锁串行化 —— 这就是"不超卖"的根因。
+         返回受影响行数：1 = 扣减成功，0 = 库存不足（售罄）。
          ============================================================ -->
+    <update id="decrementStock">
+        UPDATE product
+        SET stock = stock - 1
+        WHERE id = #{id}
+          AND stock > 0
+    </update>
 
-    <!-- ============================================================
-         乐观锁路线（可选）：带 version 的 CAS 扣减。
-         返回 0 说明 version 已被别的线程改过，需要在 service 层重试。
-         想走乐观锁就把下面的占位补全：
-         <update id="decrementStockOptimistic">
-             UPDATE product
-             SET stock = stock - 1, version = version + 1
-             WHERE id = #{id} AND version = #{version} AND stock > 0
-         </update>
-         ============================================================ -->
-
-    <!-- 骨架里现存的"先读后写"式扣减（反面教材）：只负责把库存写成指定值，没有 stock > 0 守卫、
-         也不是原子操作。调用方必须先 selectStock 读、应用里判断、再调它写回 ——
-         "读-判断-写"之间的窗口就是超卖的根源（丢失更新）。Stage 3 要改掉它。 -->
+    <!-- 骨架里遗留的"先读后写"式扣减：只把库存写成指定值，没有 stock > 0 守卫、也非原子。
+         参考解不再调用它（保留绑定是为了让骨架/参考解共用同一套 Mapper 接口）。 -->
     <update id="updateStock">
         UPDATE product
         SET stock = #{stock}
         WHERE id = #{id}
     </update>
+
+    <!-- 乐观锁路线（可选）：带 version 的 CAS 扣减；返回 0 表示版本被别人改过，需要重试 -->
+    <update id="decrementStockOptimistic">
+        UPDATE product
+        SET stock = stock - 1, version = version + 1
+        WHERE id = #{id}
+          AND version = #{version}
+          AND stock > 0
+    </update>
+
 </mapper>
