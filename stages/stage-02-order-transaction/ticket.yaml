@@ -9,7 +9,7 @@
 #              D1 —— mentor_policy.may_write 绝不与 scope.files_to_change 相交）
 #
 # 八个 concern 各管一件事，互不串味：identity(身份+版本锚点) / brief(题面) / scope(改动面) /
-# grader(红绿判据) / hints(阶梯提示) / submission(PR 即答辩) / mentor_policy(导师权限) /
+# grader(红绿判据) / hints(阶梯提示) / submission(提交即答辩) / mentor_policy(导师权限) /
 # progression(解锁依赖)。平台的 AI 经理**只拿这份文件**发卷，所以 brief.problem 必须自足。
 #
 # 学习者读的叙述版（线上问题的故事、「关键思考」四问）在
@@ -134,7 +134,7 @@ hints:
   - id: H4
     text: "重复下单为什么必然抛异常？因为 seckill_order 上有唯一键 uk_user_product (user_id, product_id)，第二次 INSERT 会被 MySQL 拒绝（错误码 1062，Spring 翻译成 DuplicateKeyException）。这正是你要的**天然故障注入点**：不用自己伪造异常，就能让「扣库存成功之后」那一步失败。再想一层——如果你把 insertOrder 写在扣库存**之前**，这个用例还能验到回滚吗？（代码结构自己定，这里只给方向。）"
 
-# ── submission：PR 即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
+# ── submission：提交即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
 submission:
   template:
     require:

@@ -9,7 +9,7 @@
 #              D1 —— mentor_policy.may_write 绝不与 scope.files_to_change 相交）
 #
 # 八个 concern 各管一件事，互不串味：identity(身份+版本锚点) / brief(题面) / scope(改动面) /
-# grader(红绿判据) / hints(阶梯提示) / submission(PR 即答辩) / mentor_policy(导师权限) /
+# grader(红绿判据) / hints(阶梯提示) / submission(提交即答辩) / mentor_policy(导师权限) /
 # progression(解锁依赖)。平台的 AI 经理**只拿这份文件**发卷，所以 brief.problem 必须自足。
 #
 # 本阶段是**选修**：不做也不影响主线（prerequisites 依赖 db-stage-05，但解锁只是"可用"，
@@ -188,7 +188,7 @@ hints:
       不断 EXPIRE 把 TTL 续上，代价是多一个后台线程 + 续期本身也可能失败（续不上就该主动放弃业务）。
       进阶（了解即可，本项目不实现）：Redlock 拿多个独立 Redis 节点投票，业界对其安全性有争议。
 
-# ── submission：PR 即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
+# ── submission：提交即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
 submission:
   template:
     require:

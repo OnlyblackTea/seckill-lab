@@ -83,7 +83,7 @@ mvn test -Dgroups=stage02
 
 ## 六、做完之后
 
-按 ticket.yaml `submission.template.require` 的**三件套**贴给导师 review。这就是「PR 即答辩」
+按 ticket.yaml `submission.template.require` 的**三件套**填进平台的「提交」（答辩文本）。这就是「提交即答辩」
 （设计 §11.1，本项目的「做完之后三件套」正是它的出处）。注意第二件和第三件才是本工单的重点：
 **光有能跑通的代码不算过关，你得讲得出事务边界为什么在那、哪些异常会回滚，并拿出回滚的实测证据。**
 

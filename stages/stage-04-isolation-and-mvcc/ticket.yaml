@@ -9,7 +9,7 @@
 #              D1 —— mentor_policy.may_write 绝不与 scope.files_to_change 相交）
 #
 # 八个 concern 各管一件事，互不串味：identity(身份+版本锚点) / brief(题面) / scope(改动面) /
-# grader(红绿判据) / hints(阶梯提示) / submission(PR 即答辩) / mentor_policy(导师权限) /
+# grader(红绿判据) / hints(阶梯提示) / submission(提交即答辩) / mentor_policy(导师权限) /
 # progression(解锁依赖)。平台的 AI 经理**只拿这份文件**发卷，所以 brief.problem 必须自足。
 #
 # 学习者读的叙述版（线上问题的故事、「关键思考」五问）在
@@ -124,7 +124,7 @@ hints:
   - id: H4
     text: "MVCC / ReadView：InnoDB 每行有隐藏的 trx_id（最后一次改它的版本号）和 roll_pointer（指向 undo log 版本链）。普通 SELECT 是**快照读**——按 ReadView 的可见性规则沿版本链找「我能看见的那个版本」，不加锁；UPDATE / DELETE / SELECT ... FOR UPDATE 是**当前读**——读最新已提交版本并加锁。ReadView 的生成时机是 RR 与 RC 的分水岭：RR 在事务内第一次快照读时生成、之后整个事务复用同一个 ReadView，所以同一事务两次读结果一致（可重复读）；RC 每次 SELECT 都重新生成，所以每次都能看到别的事务新提交的数据（不可重复读）。所以「同事务两次读一致」与「跨事务能看到新提交」并不矛盾：前者是同一个 ReadView 的作用域，后者是新事务新 ReadView 的结果。线上 bug 的经典形状：扣库存的 UPDATE ... WHERE stock > 0 是当前读，同事务里随后那句普通 SELECT 是快照读——若 ReadView 在 UPDATE 之前就生成，SELECT 会读回扣减前的旧库存，看起来就是「扣成功了但库存没变」。要在同一事务里核对刚写下去的值，就用当前读（SELECT ... FOR UPDATE）或另起新事务读。至于 FOR UPDATE 的锁与间隙锁细节，是 Stage 6 的话题。"
 
-# ── submission：PR 即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
+# ── submission：提交即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
 submission:
   template:
     require:

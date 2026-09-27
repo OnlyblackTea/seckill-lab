@@ -113,7 +113,7 @@ mvn test -Dgroups=sim -Dtest.excludedGroups=
 
 ## 六、做完之后
 
-按 ticket.yaml `submission.template.require` 的**三件套**贴给导师 review。这就是「PR 即答辩」
+按 ticket.yaml `submission.template.require` 的**三件套**填进平台的「提交」（答辩文本）。这就是「提交即答辩」
 （设计 §11.1，本项目的「做完之后三件套」正是它的出处）。注意本工单的**第二件**才是真正拉开
 差距的地方：**光有一套能跑通的抢锁代码不算过关，你得讲得出你的锁为什么不会误删、
 为什么持锁进程崩了不会永久死锁，并拿出前后对比的实测证据。**

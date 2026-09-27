@@ -9,7 +9,7 @@
 #              D1 —— mentor_policy.may_write 绝不与 scope.files_to_change 相交）
 #
 # 八个 concern 各管一件事，互不串味：identity(身份+版本锚点) / brief(题面) / scope(改动面) /
-# grader(红绿判据) / hints(阶梯提示) / submission(PR 即答辩) / mentor_policy(导师权限) /
+# grader(红绿判据) / hints(阶梯提示) / submission(提交即答辩) / mentor_policy(导师权限) /
 # progression(解锁依赖)。平台的 AI 经理**只拿这份文件**发卷，所以 brief.problem 必须自足。
 #
 # 学习者读的叙述版（线上问题的故事、「关键思考」四问）在
@@ -99,7 +99,7 @@ hints:
   - id: H4
     text: "如果 EXPLAIN 里 key=idx_product_search 但 Extra 出现 Using filesort，说明你的列顺序没能同时满足过滤和排序——回到「最左前缀」重排列顺序：等值列在前，范围/排序列在后。"
 
-# ── submission：PR 即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
+# ── submission：提交即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
 submission:
   template:
     require:

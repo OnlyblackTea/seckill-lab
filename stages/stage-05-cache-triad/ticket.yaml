@@ -9,7 +9,7 @@
 #              D1 —— mentor_policy.may_write 绝不与 scope.files_to_change 相交）
 #
 # 八个 concern 各管一件事，互不串味：identity(身份+版本锚点) / brief(题面) / scope(改动面) /
-# grader(红绿判据) / hints(阶梯提示) / submission(PR 即答辩) / mentor_policy(导师权限) /
+# grader(红绿判据) / hints(阶梯提示) / submission(提交即答辩) / mentor_policy(导师权限) /
 # progression(解锁依赖)。平台的 AI 经理**只拿这份文件**发卷，所以 brief.problem 必须自足。
 #
 # 学习者读的叙述版（线上问题的故事、「关键思考」六问、TTL 的取舍）在
@@ -153,7 +153,7 @@ hints:
   # 提示纪律：这四条只给方向、命令与原理对比，**不给可直接抄的完整代码**——
   # 代码是要学员自己能讲出来的东西（D1）。
 
-# ── submission：PR 即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
+# ── submission：提交即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
 submission:
   template:
     require:

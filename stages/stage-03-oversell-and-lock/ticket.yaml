@@ -119,7 +119,7 @@ hints:
         * 乐观锁：version 字段做 CAS，更新 0 行就重试；写冲突多时重试会很频繁，秒杀场景通常不划算。
       自检：你的实现里，"读库存"和"改库存"之间还剩下任何一个可以被其它线程插进来的时间窗口吗？
 
-# ── submission：PR 即答辩（§11.1）──
+# ── submission：提交即答辩（§11.1）──
 submission:
   template:
     require:

@@ -73,7 +73,7 @@ mvn test -Dgroups=stage01
 
 ## 六、做完之后
 
-按 ticket.yaml `submission.template.require` 的**三件套**贴给导师 review。这就是「PR 即答辩」
+按 ticket.yaml `submission.template.require` 的**三件套**填进平台的「提交」（答辩文本）。这就是「提交即答辩」
 （设计 §11.1，本项目的「做完之后三件套」正是它的出处）。
 
 review 通过 → 导师带你过一遍「索引 & 执行计划」八股（`docs/数据库八股地图.md` Stage 1，
