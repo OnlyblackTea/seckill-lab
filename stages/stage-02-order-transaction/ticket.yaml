@@ -16,71 +16,69 @@
 #   TASKS/stage-02-order-transaction.md
 # 两者冲突时**以本文件为准**；本文件改了判据/题面要 bump identity.ticket_version（旧 Instance 失效，§9.2）。
 #
-# 状态说明（勿删）：本 ticket 已定稿，但 Stage 2 的骨架与 canonical 测试**尚未放出**，
-# 所以 grader.correctness.expect 里的红/绿形状是**设计预期**而非 VM 实测（Stage 1 已实测，
-# 见 TASKS/evidence-stage-01/REPORT.md）。骨架落地后必须真机跑一次
-# `mvn -B -Dgroups=stage02 test`（先红后绿），把实测数字回填进 expect，做法与 Stage 1 一致。
+# 写作规范（2026-09-27 起）：题面与判据按平台仓 `bagu-trainer/docs/工单写作规范.md` 的"叙事优先"重写——
+# 自然段承载叙事、标题承载语义层级、列表只表达真正的并列，hints 每条带 title。
+# 同时**按骨架与 canonical 测试的现状校正了事实**：本 ticket 此前描述的是重构前的骨架
+# （"XML 未绑定 + seckill() 未实现"），而骨架早在那轮"让每个 stage 红在正确的地方"的改动里
+# 就把 insertOrder / countByProduct 绑好、把 placeOrder 写通了；Stage 2 真正的红是**回滚**没发生。
+# 实测形状见 TASKS/evidence-stages-02-06/REPORT.md（骨架 1 failure；参考解 3/3 绿）。
 
 # ── identity：身份 + 版本锚点（发卷时钉进 TicketInstance，回答「这 PR 基于哪个版本」，§9.1）──
 identity:
   id: db-stage-02
   schema_version: 1                 # ticket.yaml 结构版本（schema 演进用）
-  ticket_version: 1                 # 本工单内容版本；改题面/判据 → bump → 旧 Instance 变 stale
+  ticket_version: 2                 # 本工单内容版本；改题面/判据 → bump → 旧 Instance 变 stale
   stage: 2
   title: 下单事务要原子
 
 # ── brief：题面（自足，AI 经理据此发卷）──
 brief:
   problem: |
-    【线上问题｜来自：交易组 · 优先级 P0】
-    运营和客服一起找上来：秒杀**下单偶尔丢数据**。用户明明抢到了，product.stock 也确实少了 1，
-    可 seckill_order 里查不到这张订单；偶尔反过来——订单建出来了，库存却没动。财务月底对账
-    直接对不上，差了几百单。根因：当前实现把「扣库存」和「写订单」拆成两个**各自自动提交**的
-    事务，中间任何一步失败，另一半就永久留在库里了。请你把它改成一个原子操作。
+    ## 问题背景
 
-    这不是编的——本骨架下单链路上的两个数据访问动作彼此独立，谁也没有把它们绑在一起。
-    没有事务就没有原子性：第一步成功、第二步失败时，谁也不会替你把第一步撤回来。
-    这就是 ACID 里 A（Atomicity）在代码上的落点。
+    【线上问题｜来自：交易组 · 优先级 P0】运营和客服一起找上来：秒杀**下单偶尔丢数据**。
+    用户明明抢到了，`product.stock` 也确实少了 1，可 `seckill_order` 里查不到这张订单；
+    偶尔又反过来——订单建出来了，库存却没动。财务月底对账直接对不上，差了几百单。
 
-    【你要做什么｜正好改两个文件（就是 scope.files_to_change 那两个）】
-    1) src/main/resources/mapper/OrderMapper.xml
-       现在整个 mapper 体是注释占位，两条语句都**未绑定**，调用抛
-         BindingException: Invalid bound statement (not found): com.devteam.seckill.mapper.OrderMapper.insertOrder
-       把它们补全（id 必须与 OrderMapper 接口方法名完全一致，见 docs/架构与约定.md 第 4 节）：
-         a) insertOrder(SeckillOrder order) → 返回受影响行数（int）
-            INSERT INTO seckill_order (user_id, product_id, quantity, amount, status)
-            VALUES (#{userId}, #{productId}, #{quantity}, #{amount}, #{status})
-            要求 useGeneratedKeys="true" keyProperty="id"：自增主键必须回填到入参对象上，
-            否则 seckill() 拿不到订单 id，验收第一例必红。
-         b) countByProduct(@Param("productId") Long productId) → 返回 int
-            SELECT COUNT(*) FROM seckill_order WHERE product_id = #{productId}
-            （Stage 3 校验超卖时会用它；本工单的验收也要靠它数订单。）
-        XML 是 MyBatis 的 mapper 资源：改它不需要动 OrderMapper.java 接口，方法签名已经写好、参数名对得上。
-    2) src/main/java/com/devteam/seckill/service/SeckillService.java
-       实现 seckill(Long userId, Long productId)（现在直接 throw new UnsupportedOperationException）：
-       在**同一个事务**里「扣库存 + 建订单」，用 Spring 的 @Transactional。硬要求：
-         * 事务边界在 **service 层**——这是项目规范，理由见 docs/架构与约定.md 第 1 节
-           （controller 层加事务会把 HTTP 处理时间算进事务、拉长持锁时间；mapper 层太细，
-             盖不住「多步操作」）。
-         * 扣库存：product.stock 必须 stock > 0 才扣，SQL 形状固定为
-             UPDATE product SET stock = stock - 1 WHERE id = #{id} AND stock > 0
-           看它的**受影响行数**：> 0 才算扣到；== 0 说明已经售罄。
-         * 售罄时抛 com.devteam.seckill.service.SoldOutException（未受检异常，继承 RuntimeException）。
-         * 建订单：quantity = 1、status = 0、amount 取该商品**当前** price；表上有唯一键
-           uk_user_product (user_id, product_id)，所以**同一用户对同一商品重复下单会抛
-           DuplicateKeyException**（Spring 把 MySQL 的 1062 翻译成它，它继承自
-           DataIntegrityViolationException → RuntimeException）。
-         * 顺序：**必须先扣库存、再插订单**。这不是风格偏好——它是让「重复下单」用例
-           真的能验到回滚的前提（先插单的话冲突会在插单时就炸，库存那一步根本还没执行，验了个空气）。
-         * @Transactional **必须能在异常时整体回滚**：这是本工单的核心考点
-           （ACID / 事务边界 / 传播行为 / rollbackFor）。
+    根因不在业务逻辑，而在**事务边界**：骨架的下单链路把「扣库存」和「写订单」拆成两个各自
+    自动提交的数据访问动作，中间没有任何东西把它们绑在一起。第一步成功、第二步失败时，谁也
+    不会替你把第一步撤回来——这就是 ACID 里 A（Atomicity）在代码上的落点。请你把它改成
+    一个原子操作。
 
-    【骨架约定（不是你要改的文件，但决定了你怎么调）】
-    * 扣库存的 UPDATE 通过骨架已提供的数据访问入口执行（注入 JdbcTemplate，或骨架提供的
-      ProductMapper 更新方法）；seckill() 需要的订单写入走 OrderMapper——两者在同一个
-      @Transactional 里就共享同一个连接、同一个事务。
-    * 不要为了少写一个 XML 语句就在 Java 里拼 SQL：项目规范是**手写 SQL 全部落在 mapper XML**
-      （docs/架构与约定.md 第 4 节），参数一律 #{}，禁止 ${}。
+    ## 你需要完成的修改
+
+    改动面是两个文件（`scope.files_to_change`），但**这道题的活只有一个**：
+
+    `src/main/java/com/devteam/seckill/service/SeckillService.java` —— 这是你要改的文件。
+    `seckill(userId, productId)` 现在会走 `placeOrder(...)`，而 `placeOrder` 依次做了三件事：
+    读商品与库存、扣库存（`updateStock(productId, stock - 1)`）、调 `OrderMapper.insertOrder(...)`
+    写订单。三步都**没有事务**包裹，各自 autocommit。你要做的就是把「扣库存 + 建订单」收进
+    **同一个事务**，用 Spring 的 `@Transactional`，并想清楚**哪些异常会触发回滚、哪些不会**。
+
+    事务边界要打在 **service 层**：这是项目规范，理由在 `docs/架构与约定.md` 第 1 节——
+    放 controller 会把 HTTP 处理时间算进事务、拉长持锁时间；放 mapper 又太细，盖不住「多步操作」。
+    方法必须是 public，而且只能由**外部**调用它：同类内部自调用不走代理，事务会静默失效。
+
+    写事务的时候请顺手确认两件与判据相关的事。其一，扣库存要看**受影响行数**：本项目里
+    `product.stock` 必须 `stock > 0` 才扣，形状是
+    `UPDATE product SET stock = stock - 1 WHERE id = #{id} AND stock > 0`，受影响行数大于 0 才算
+    扣到，等于 0 说明已经售罄，此时返回售罄结果（`SeckillResult.soldOut(productId)`）。
+    其二，`seckill_order` 上有唯一键 `uk_user_product (user_id, product_id)`，所以同一用户对同一
+    商品重复下单时 `INSERT` 会被 MySQL 拒绝（错误码 1062，Spring 翻译成 `DuplicateKeyException`，
+    它继承自 `DataIntegrityViolationException`，属于**未受检异常**）。
+
+    顺序是**必须先扣库存、再插订单**，这一点不是风格偏好：如果调过来，重复下单会在插单那一刻就
+    撞上唯一键，库存那一步根本还没执行——第二个用例就验了个空气，而不是验回滚。
+
+    `src/main/resources/mapper/OrderMapper.xml` 在改动面里，但它**骨架里已经绑定好了**：
+    `insertOrder` 配了 `useGeneratedKeys="true" keyProperty="id"`（自增主键回填到入参对象上，
+    所以 `result.orderId()` 非空）、`countByProduct` 也已实现。把它留在改动面是为了给你一个
+    可以照着写的样式（参数一律 `#{}`、禁止 `${}`）；这道题不需要改它，改了也不算越界。
+
+    【骨架约定（决定了你怎么调）】扣库存那条 UPDATE 通过骨架已提供的数据访问入口执行
+    （`ProductMapper.updateStock`，或注入 `JdbcTemplate`），订单写入走 `OrderMapper`——两者只要
+    在同一个 `@Transactional` 里，就共享同一个连接、同一个事务。另外不要为了少写一条 XML 语句
+    就在 Java 里拼 SQL：项目规范是**手写 SQL 全部落在 mapper XML**（`docs/架构与约定.md` 第 4 节）。
   # 注：列表里的 '@Transactional' 必须加引号——YAML 里裸的 '@' 是保留指示符，解析会直接报错。
   concepts: ["ACID", "事务边界", "@Transactional", "回滚规则", "传播行为", "事务失效"]
 
@@ -96,51 +94,55 @@ grader:
     test_group: stage02              # 运行：mvn test -Dgroups=stage02
     test_version: 1                  # canonical 测试版本；与 ticket_version 一起钉进 Instance
     canonical_test: src/test/java/com/devteam/seckill/stage02/SeckillTransactionAcceptanceTest.java
-    # 下面两个原因会在初始骨架上**依次**暴露：seckill() 未实现时测试直接在
-    # UnsupportedOperationException 上红；就算先把 service 补上，未绑定的 XML 仍会抛
-    # BindingException。两者都算「红在该红的地方」——骨架落地后以实测到的先后为准回填。
     expect: |-
-      初始为【红】，且必须红在这两个原因上（设计预期，待 VM 实测回填具体计数）：
-        ① SeckillService.seckill() 未实现 → UnsupportedOperationException: 秒杀下单逻辑尚未实现 → 两个用例都失败；
-        ② OrderMapper.xml 的 insertOrder / countByProduct 未绑定 →
-           BindingException: Invalid bound statement (not found):
-             com.devteam.seckill.mapper.OrderMapper.insertOrder
-        注：若 @Sql 脚本缺失/为空、或连接不上真 MySQL，那是红在**错误的地方**，不算数。
-      改对后为【绿】：
-        ① 正常下单：某商品 stock=1 时 seckill(user, product) 返回的订单
-           id 非空（useGeneratedKeys 生效）、quantity=1、status=0、amount 等于该商品 price；
-           随后该商品 stock == 原值 - 1，且 countByProduct(productId) == 原订单数 + 1。
-        ② 回滚（本工单核心）：先成功下一单，再用**同一 user + 同一 product** 再下一单——
-           第二次抛异常（DuplicateKeyException 或其包装，非受检异常），
-           且**此时该商品 stock 必须与第一次下单后完全相同**（未再 -1），
-           countByProduct 也不增。这一条证明「扣库存」被回滚了，
-           而不是留下「库存扣了但订单没建」的经典丢单。
+      初始为【红】，而且**只红在回滚这一件事上**：三个用例里
+      `rollback_onOrderInsertFailure_restoresStock` 失败——先给某个用户在同一商品上预置一条订单
+      （制造唯一键冲突），再让他下一单，INSERT 必然失败；可是此刻库存已经在前面被扣掉并且提交了，
+      于是断言「建订单失败后库存必须回到原值」不成立。另外两个用例（正常下单、售罄不扣成负数）
+      在骨架上本来就是绿的：骨架功能上是通的，缺的只是原子性。这就是「红在对的地方」——
+      红在业务缺陷，不是编译错、不是脚本为空、不是装配失败（实测见
+      TASKS/evidence-stages-02-06/REPORT.md）。
+
+      改对后为【绿】，三个用例都过。正常下单时，库存从 5 减到 4、返回的剩余库存与库里一致、
+      `countByProduct(productId)` 恰好是 1，而且返回的订单 id 非空、按它能查到订单（`insertOrder`
+      的 `useGeneratedKeys` 生效）。售罄场景里，卖完最后一件之后库存停在 0、再下一单返回失败且
+      没有订单 id、也不会被判成「重复下单」，订单数恰好等于初始库存。
+
+      核心用例要的是这件事：重复下单失败之后，**商品库存必须与失败前完全相同**，
+      `countByProduct` 也不增加。换句话说，它验的不是「异常能不能抛出来」，而是异常发生之后
+      整个事务能不能保持一致——没有回滚，就会留下「库存扣了但订单没建」的经典丢单。
   performance: null                  # Stage 2 不判性能：本工单只谈事务正确性（索引/EXPLAIN 是 Stage 1 的判据）
   concurrency: null                  # Stage 3+ 才有（零超卖 sim，§7.5）
 
-# ── hints：阶梯式提示，默认折叠；展开一条会计入学习者画像（§10）──
+# ── hints：阶梯式提示，默认折叠（标题是「提示 N：title」）；展开一条会计入学习者画像（§10）──
 hints:
   - id: H1
-    text: "@Transactional 打在 SeckillService.seckill(Long, Long) 这个方法上（方法必须 public，且只能由**外部**调用它——同类内部自调用不走代理，事务会静默失效）。事务边界在 service 层，别往 controller 或 mapper 挪。"
+    title: 事务边界
+    text: "`@Transactional` 应该打在哪个方法上？本题是 `SeckillService.seckill(Long, Long)`——方法必须是 public，而且只能由**外部**调用它（同类内部自调用不走代理，事务会静默失效）。再想一层：把它挪到 controller 层或 mapper 层分别要付出什么代价？"
   - id: H2
-    text: "「异常时回滚」不是自动成立的：Spring 默认只对 RuntimeException / Error 回滚，受检异常抛出去**不会**回滚。想想你这条链路上会抛什么——SoldOutException（你自定义的）和重复下单的 DuplicateKeyException / DataIntegrityViolationException 分别属于哪一类？把 API 文档里 @Transactional 的 rollbackFor 默认值查清楚再动手。"
+    title: 回滚规则
+    text: "「异常时回滚」不是自动成立的：Spring 默认只对 RuntimeException / Error 回滚，受检异常抛出去**不会**回滚。把 API 文档里 `@Transactional` 的 rollbackFor 默认值查清楚，再看你这条链路上会抛什么——重复下单撞唯一键抛出的 `DuplicateKeyException` / `DataIntegrityViolationException` 属于哪一类？"
   - id: H3
+    title: 怎么验证回滚
     text: |-
-      想手动验证「异常之后库存到底回没回滚」？改代码前后各跑一次下面的对照（把 PRODUCT_ID / USER_ID 换成你的 fixture）：
+      想亲眼看见「异常之后库存到底回没回滚」？改代码前后各跑一次下面的对照（把 PRODUCT_ID / USER_ID 换成你的 fixture）：
+
         docker compose -f docker/docker-compose.yml exec mysql mysql -uroot -pbagu1234 seckill_lab \
           -e "SELECT id, stock FROM product WHERE id=PRODUCT_ID;
               SELECT COUNT(*) AS orders FROM seckill_order WHERE product_id=PRODUCT_ID;"
+
       在两次下单之间手动插一条同 (user_id, product_id) 的订单，就能制造出唯一键冲突；观察冲突之后 stock 有没有停在半路。
   - id: H4
-    text: "重复下单为什么必然抛异常？因为 seckill_order 上有唯一键 uk_user_product (user_id, product_id)，第二次 INSERT 会被 MySQL 拒绝（错误码 1062，Spring 翻译成 DuplicateKeyException）。这正是你要的**天然故障注入点**：不用自己伪造异常，就能让「扣库存成功之后」那一步失败。再想一层——如果你把 insertOrder 写在扣库存**之前**，这个用例还能验到回滚吗？（代码结构自己定，这里只给方向。）"
+    title: 再想一层
+    text: "为什么「先扣库存、再插订单」这个顺序不能反过来？因为顺序一变，重复下单会在插单那一刻就炸，库存那一步还没执行——这条用例就再也验不到回滚了。再往深想：哪些写法会让 `@Transactional` 静默失效？（自调用、异常被 catch 吞掉、方法不是 public、多线程……）提示：它是**代理**在起作用，想清楚代理被绕过的情形。"
 
 # ── submission：提交即答辩（§11.1 承继 seckill-lab 的「做完之后三件套」）──
 submission:
   template:
     require:
-      - 改后的 insertOrder / countByProduct 两条 SQL，以及 seckill() 的实现
+      - 改后的 seckill() / placeOrder() 实现（事务边界在哪一行、为什么在那）
       - 一句话解释事务边界为什么放在 service 层，并说清哪些异常会触发回滚、哪些不会
-      - 证明回滚的实测证据：重复下单抛异常前后，同一商品的 stock 与订单数对比
+      - 证明回滚的实测证据：重复下单失败前后，同一商品的 stock 与订单数对比
   # 锚点由 admission._github_anchor 实算：lowercase → 只保留「字母/数字/空格/-/_」（丢弃 · 与 & 与 emoji）
   #   → 空格替换成 '-'（空格不折叠，所以每个空格各留一个连字符）。
   # 本 Stage 的标题原文（docs/数据库八股地图.md 第 35 行）：

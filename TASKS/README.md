@@ -8,7 +8,9 @@
 > （这个 track 是什么、跑什么、被哪些 digest 锁定）和 [`stages/*/ticket.yaml`](../stages)
 > （每张工单的题面、改动面、红绿判据、hints、答辩要求、导师权限、解锁依赖）。
 > 本目录的 md 与 ticket.yaml 冲突时**以 ticket.yaml 为准**——事实只存一份，避免悄悄漂移。
-> 契约格式来自发卷平台（bagu-trainer 设计 §4.2/§4.3），准入校验命令是 `paper validate-track`。
+> 契约格式来自发卷平台（bagu-trainer 设计 §4.2/§4.3），准入校验命令是 `paper validate-track`；
+> **题面/判据/hints 该怎么写**（叙事优先 + 每条 hint 带标题）由平台仓的
+> `bagu-trainer/docs/工单写作规范.md` 定，本仓只放这条指针、不复制正文。
 
 ## 进度看板
 
